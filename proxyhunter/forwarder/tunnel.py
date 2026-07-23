@@ -60,9 +60,15 @@ def connect_via_upstream(upstream: Proxy, target_host: str, target_port: int, ti
     return sock
 
 
-def relay(a: socket.socket, b: socket.socket, idle_timeout: float = 120.0) -> None:
-    """Pipe bytes between two connected sockets until either side closes or goes idle."""
+def relay(a: socket.socket, b: socket.socket, idle_timeout: float = 120.0) -> int:
+    """Pipe bytes between two connected sockets until either side closes or goes idle.
+
+    Returns the total number of bytes relayed in either direction, so callers
+    can tell an upstream that accepted the connection but never actually
+    moved any data (e.g. closed right away) apart from one that did.
+    """
     sockets = [a, b]
+    total_bytes = 0
     try:
         while True:
             readable, _, exceptional = select.select(sockets, [], sockets, idle_timeout)
@@ -84,6 +90,7 @@ def relay(a: socket.socket, b: socket.socket, idle_timeout: float = 120.0) -> No
                 except OSError:
                     closed = True
                     break
+                total_bytes += len(data)
             if closed:
                 break
     finally:
@@ -92,3 +99,4 @@ def relay(a: socket.socket, b: socket.socket, idle_timeout: float = 120.0) -> No
                 s.close()
             except OSError:
                 pass
+    return total_bytes

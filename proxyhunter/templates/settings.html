@@ -111,6 +111,18 @@
   </section>
 
   <section class="panel">
+    <h2 data-i18n="settings.section_pool">转发池设置(保存后立即生效,无需重启)</h2>
+    <div class="form-grid">
+      <label><span data-i18n="settings.pool_fail_threshold">代理连续失败多少次后判定为失效(可在转发池中手动"启用"恢复)</span>
+        <input type="number" name="pool_fail_threshold" min="1">
+      </label>
+      <label><span data-i18n="settings.pool_max_retries">转发请求失败后,最多切换到几个不同的代理重试</span>
+        <input type="number" name="pool_max_retries" min="0">
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2 data-i18n="settings.section_interface">界面设置(保存后立即生效,无需重启)</h2>
     <div class="form-grid">
       <label><span data-i18n="settings.ui_language">界面语言</span>

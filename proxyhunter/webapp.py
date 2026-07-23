@@ -250,7 +250,7 @@ def run_server(settings_file: Path, cli_seed: dict) -> None:
 
     store_path = Path(cli_seed.get("state_file")) if cli_seed.get("state_file") else Path("proxyhunter_state.json")
     store = ProxyStore(store_path)
-    pool = ProxyPool()
+    pool = ProxyPool(settings=settings)
     pool.set_proxies([p for p in (store.get_by_key(k) for k in settings.get("selected_keys", [])) if p is not None])
     jobs = JobRunner(store, settings)
     scheduler = Scheduler(store, pool, jobs, settings)

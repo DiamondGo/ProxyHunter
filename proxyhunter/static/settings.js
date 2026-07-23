@@ -62,6 +62,9 @@ function populateForm(settings) {
   form.sched_revalidate_enabled.checked = !!settings.sched_revalidate_enabled;
   form.sched_revalidate_interval_hours.value = settings.sched_revalidate_interval_hours ?? "";
   document.getElementById("sched-revalidate-last-run").textContent = fmtLastRun(settings.sched_revalidate_last_run);
+
+  form.pool_fail_threshold.value = settings.pool_fail_threshold ?? "";
+  form.pool_max_retries.value = settings.pool_max_retries ?? "";
 }
 
 function showRestartBanner(text) {
@@ -121,6 +124,8 @@ form.addEventListener("submit", async (e) => {
     sched_pool_https_only: form.sched_pool_https_only.checked,
     sched_revalidate_enabled: form.sched_revalidate_enabled.checked,
     sched_revalidate_interval_hours: form.sched_revalidate_interval_hours.value,
+    pool_fail_threshold: form.pool_fail_threshold.value,
+    pool_max_retries: form.pool_max_retries.value,
     ui_language: form.ui_language.value,
   };
   try {

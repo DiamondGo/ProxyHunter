@@ -5,7 +5,7 @@ import threading
 
 from proxyhunter.models import Proxy
 
-DEFAULT_FAIL_THRESHOLD = 3
+DEFAULT_FAIL_THRESHOLD = 10
 
 
 class ProxyPool:
@@ -19,8 +19,13 @@ class ProxyPool:
     user re-validates it or removes it explicitly.
     """
 
-    def __init__(self, fail_threshold: int = DEFAULT_FAIL_THRESHOLD):
-        self.fail_threshold = fail_threshold
+    def __init__(self, settings=None, fail_threshold: int = DEFAULT_FAIL_THRESHOLD):
+        # When a SettingsStore is given, fail_threshold is read fresh from it
+        # on every use (via the property below) so the user's "pool_fail_threshold"
+        # setting applies immediately, without a service restart. Otherwise
+        # (e.g. in tests) it falls back to the fixed value passed in here.
+        self._settings = settings
+        self._fixed_fail_threshold = fail_threshold
         self._lock = threading.Lock()
         self._proxies: list[Proxy] = []
         self._fail_counts: dict[str, int] = {}
@@ -28,6 +33,12 @@ class ProxyPool:
         self._request_counts: dict[str, int] = {}
         self._success_counts: dict[str, int] = {}
         self._cycle = iter(())
+
+    @property
+    def fail_threshold(self) -> int:
+        if self._settings is not None:
+            return int(self._settings.get("pool_fail_threshold", DEFAULT_FAIL_THRESHOLD))
+        return self._fixed_fail_threshold
 
     def _rebuild_cycle_locked(self) -> None:
         usable = [p for p in self._proxies if p.key_str() not in self._failed]

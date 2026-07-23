@@ -15,6 +15,7 @@ SCRAPE_KEYS = (
     "sched_pool_topup_enabled", "sched_pool_topup_interval_hours", "sched_pool_topup_min_count",
     "sched_pool_https_only",
     "sched_revalidate_enabled", "sched_revalidate_interval_hours",
+    "pool_fail_threshold", "pool_max_retries",
 )
 # Settings baked into already-bound sockets at process start - changing these
 # only takes effect after the process restarts.
@@ -56,6 +57,8 @@ DEFAULTS = {
     "sched_revalidate_enabled": False,
     "sched_revalidate_interval_hours": 12.0,
     "sched_revalidate_last_run": 0,
+    "pool_fail_threshold": 10,
+    "pool_max_retries": 3,
     "ui_language": "zh",
 }
 
@@ -87,6 +90,8 @@ _FIELD_TYPES = {
     "sched_pool_https_only": "bool",
     "sched_revalidate_enabled": "bool",
     "sched_revalidate_interval_hours": "float",
+    "pool_fail_threshold": "int",
+    "pool_max_retries": "int",
     "ui_language": "str",
     # sched_*_last_run deliberately excluded: it's written only by the
     # scheduler itself (via SettingsStore.update), never accepted from the

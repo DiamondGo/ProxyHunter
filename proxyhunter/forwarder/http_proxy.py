@@ -12,7 +12,7 @@ from proxyhunter.settings import SettingsStore
 log = logging.getLogger(__name__)
 
 MAX_HEAD_BYTES = 1 << 20
-MAX_RETRIES = 3
+DEFAULT_MAX_RETRIES = 3
 
 
 class _HttpProxyHandler(socketserver.BaseRequestHandler):
@@ -22,6 +22,10 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
     @property
     def timeout(self) -> float:
         return self.settings.get("timeout", 8.0)
+
+    @property
+    def max_retries(self) -> int:
+        return int(self.settings.get("pool_max_retries", DEFAULT_MAX_RETRIES))
 
     def handle(self) -> None:
         client = self.request
@@ -52,7 +56,7 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
         host = host_b.decode()
         port = int(port_b) if port_b else 443
 
-        candidates = self.pool.pick_many(MAX_RETRIES + 1)
+        candidates = self.pool.pick_many(self.max_retries + 1)
         if not candidates:
             self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
             return
@@ -65,9 +69,9 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
                 self.pool.report_result(upstream, False)
                 last_exc = exc
                 continue
-            self.pool.report_result(upstream, True)
             client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-            relay(client, remote)
+            transferred = relay(client, remote)
+            self.pool.report_result(upstream, transferred > 0)
             return
 
         self._send_error(client, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}")
@@ -93,7 +97,7 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
         else:
             host, port = host_port, 80
 
-        candidates = self.pool.pick_many(MAX_RETRIES + 1)
+        candidates = self.pool.pick_many(self.max_retries + 1)
         if not candidates:
             self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
             return
@@ -109,7 +113,6 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
                     self.pool.report_result(upstream, False)
                     last_exc = exc
                     continue
-                self.pool.report_result(upstream, True)
                 request_line = f"{method.decode()} {path} HTTP/1.1\r\n".encode()
             else:
                 # http/https upstreams are real forward proxies: hand them the
@@ -120,13 +123,13 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
                     self.pool.report_result(upstream, False)
                     last_exc = exc
                     continue
-                self.pool.report_result(upstream, True)
                 request_line = method + b" " + target + b" HTTP/1.1\r\n"
 
             remote.sendall(request_line + header_block)
             if leftover:
                 remote.sendall(leftover)
-            relay(client, remote)
+            transferred = relay(client, remote)
+            self.pool.report_result(upstream, transferred > 0)
             return
 
         self._send_error(client, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}")

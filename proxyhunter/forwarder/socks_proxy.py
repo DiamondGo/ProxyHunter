@@ -23,7 +23,7 @@ REP_GENERAL_FAILURE = 0x01
 REP_COMMAND_NOT_SUPPORTED = 0x07
 REP_ADDRESS_TYPE_NOT_SUPPORTED = 0x08
 
-MAX_RETRIES = 3
+DEFAULT_MAX_RETRIES = 3
 
 
 class _Socks5Handler(socketserver.BaseRequestHandler):
@@ -33,6 +33,10 @@ class _Socks5Handler(socketserver.BaseRequestHandler):
     @property
     def timeout(self) -> float:
         return self.settings.get("timeout", 8.0)
+
+    @property
+    def max_retries(self) -> int:
+        return int(self.settings.get("pool_max_retries", DEFAULT_MAX_RETRIES))
 
     def handle(self) -> None:
         client = self.request
@@ -46,7 +50,7 @@ class _Socks5Handler(socketserver.BaseRequestHandler):
         if target_host is None:
             return
 
-        candidates = self.pool.pick_many(MAX_RETRIES + 1)
+        candidates = self.pool.pick_many(self.max_retries + 1)
         if not candidates:
             self._reply(client, REP_GENERAL_FAILURE)
             return
@@ -58,9 +62,9 @@ class _Socks5Handler(socketserver.BaseRequestHandler):
                 log.debug("socks upstream connect via %s:%s failed: %s", upstream.ip, upstream.port, exc)
                 self.pool.report_result(upstream, False)
                 continue
-            self.pool.report_result(upstream, True)
             self._reply(client, REP_SUCCESS)
-            relay(client, remote)
+            transferred = relay(client, remote)
+            self.pool.report_result(upstream, transferred > 0)
             return
 
         self._reply(client, REP_GENERAL_FAILURE)
