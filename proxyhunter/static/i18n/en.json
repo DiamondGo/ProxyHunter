@@ -8,11 +8,14 @@
   "toolbar.scrape": "Full Scrape + Validate",
   "toolbar.validate_selected": "Validate Selected",
   "toolbar.validating": "Validating...",
-  "toolbar.set_pool": "Set as Forward Pool",
+  "toolbar.add_to_pool": "Add to Forward Pool",
   "toolbar.remove_from_pool": "Remove Selected from Pool",
   "toolbar.clear_pool": "Clear Pool",
   "toolbar.delete_proxies": "Delete Selected",
   "toolbar.refresh": "Refresh",
+  "toolbar.filters": "Filters",
+  "tabs.all": "All Proxies",
+  "tabs.pool": "Forward Pool",
 
   "pool_warning": "⚠️ No usable proxies left in the forward pool (all have failed) - the local proxy can't forward traffic right now. Re-validate or remove the failed proxies, or pick a new pool.",
 
@@ -23,7 +26,15 @@
   "hint.https_443": "⚠️ 443-only = this proxy only allows CONNECT to port 443, so it's only good for HTTPS sites - don't use it as a general-purpose SOCKS5/any-port upstream.",
 
   "table.select_all": "Select All / None",
-  "table.count": "{total} total, {selected} selected",
+  "table.count": "Showing {shown} of {total}, {selected} selected",
+
+  "filters.title": "Filters",
+  "filters.reset": "Reset Filters",
+  "filters.all": "All",
+  "filters.n_selected": "{n} selected",
+  "filters.min": "Min",
+  "filters.max": "Max",
+  "filters.range_to": "to",
 
   "col.status": "Status",
   "col.address": "Address",
@@ -36,6 +47,7 @@
   "col.source": "Source",
   "col.checked_at": "Last Checked",
   "col.pool": "Forward Pool",
+  "col.pool_stats": "Forwarding Stats",
 
   "status.alive": "Alive",
   "status.dead": "Dead",
@@ -46,8 +58,14 @@
   "https.only443_title": "This proxy's CONNECT only allows port 443, so it can only reach HTTPS sites; using it as a general SOCKS5/any-port upstream will fail",
 
   "pool.in_use": "In use",
+  "pool.not_in_pool": "Not in pool",
   "pool.failed": "⚠️ Failed ({count} failures)",
+  "pool.failed_label": "Failed",
   "pool.failed_title": "Too many consecutive forwarding failures, skipped during load balancing. Re-validate or remove from the forward pool",
+  "pool.add_one": "Add",
+  "pool.remove_one": "Remove",
+  "pool.stats": "{success}/{total} succeeded",
+  "pool.stats_none": "No requests yet",
 
   "job.submitted": "Submitted, starting...",
   "job.running": "Running: {message}",
@@ -57,7 +75,7 @@
   "job.summary_scrape": "Done: scraped {scraped} / unique {unique} / reused {reused} / freshly checked {fresh} / alive {alive}",
 
   "alert.select_validate": "Please select proxies to validate first",
-  "alert.select_pool": "Please select proxies to use for forwarding first",
+  "alert.select_pool": "Please select proxies to add to the forward pool first",
   "alert.select_remove_pool": "Please select proxies to remove from the pool first",
   "alert.select_delete": "Please select proxies to delete first",
   "alert.validate_done": "Validation complete: {checked} checked, {alive} alive",
@@ -88,6 +106,7 @@
   "settings.sched_pool_topup_enabled": "Auto top-up with the lowest-latency proxies when the pool runs short",
   "settings.sched_pool_topup_interval": "Check interval (hours)",
   "settings.sched_pool_topup_min_count": "Top up when usable proxies fall below this count",
+  "settings.sched_pool_https_only": "When auto-adding to the forward pool (periodic refresh + auto top-up), only pick proxies that support HTTPS",
   "settings.sched_revalidate_enabled": "Periodically re-validate known proxies",
   "settings.sched_revalidate_interval": "Validation interval (hours)",
 

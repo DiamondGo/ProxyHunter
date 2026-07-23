@@ -13,6 +13,7 @@ SCRAPE_KEYS = (
     "sched_full_scrape_enabled", "sched_full_scrape_interval_hours",
     "sched_pool_refresh_enabled", "sched_pool_refresh_interval_hours", "sched_pool_top_n",
     "sched_pool_topup_enabled", "sched_pool_topup_interval_hours", "sched_pool_topup_min_count",
+    "sched_pool_https_only",
     "sched_revalidate_enabled", "sched_revalidate_interval_hours",
 )
 # Settings baked into already-bound sockets at process start - changing these
@@ -51,6 +52,7 @@ DEFAULTS = {
     "sched_pool_topup_interval_hours": 0.5,
     "sched_pool_topup_min_count": 3,
     "sched_pool_topup_last_run": 0,
+    "sched_pool_https_only": True,
     "sched_revalidate_enabled": False,
     "sched_revalidate_interval_hours": 12.0,
     "sched_revalidate_last_run": 0,
@@ -82,6 +84,7 @@ _FIELD_TYPES = {
     "sched_pool_topup_enabled": "bool",
     "sched_pool_topup_interval_hours": "float",
     "sched_pool_topup_min_count": "int",
+    "sched_pool_https_only": "bool",
     "sched_revalidate_enabled": "bool",
     "sched_revalidate_interval_hours": "float",
     "ui_language": "str",

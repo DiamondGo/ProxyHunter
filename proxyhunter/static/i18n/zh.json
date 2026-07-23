@@ -8,11 +8,14 @@
   "toolbar.scrape": "发起全量抓取+验证",
   "toolbar.validate_selected": "验证选中项",
   "toolbar.validating": "验证中...",
-  "toolbar.set_pool": "设为转发池",
+  "toolbar.add_to_pool": "加入转发池",
   "toolbar.remove_from_pool": "从转发池移除选中项",
   "toolbar.clear_pool": "清空转发池",
   "toolbar.delete_proxies": "删除选中代理",
   "toolbar.refresh": "刷新",
+  "toolbar.filters": "筛选",
+  "tabs.all": "全部代理",
+  "tabs.pool": "转发池",
 
   "pool_warning": "⚠️ 转发池中没有可用代理了(全部已失效),本地代理现在无法转发流量。请重新验证或移除失效代理,或重新选择转发池。",
 
@@ -23,7 +26,15 @@
   "hint.https_443": "⚠️ 仅443 = 该代理只允许 CONNECT 到 443 端口,只适合访问 HTTPS 网站,不要拿去当通用 SOCKS5/任意端口转发的上游。",
 
   "table.select_all": "全选/全不选",
-  "table.count": "共 {total} 条,已选 {selected} 条",
+  "table.count": "显示 {shown} / {total} 条,已选 {selected} 条",
+
+  "filters.title": "筛选条件",
+  "filters.reset": "重置筛选",
+  "filters.all": "全部",
+  "filters.n_selected": "{n} 项已选",
+  "filters.min": "最小",
+  "filters.max": "最大",
+  "filters.range_to": "至",
 
   "col.status": "状态",
   "col.address": "地址",
@@ -36,6 +47,7 @@
   "col.source": "来源",
   "col.checked_at": "最近检测",
   "col.pool": "转发池",
+  "col.pool_stats": "转发统计",
 
   "status.alive": "存活",
   "status.dead": "失败",
@@ -46,8 +58,14 @@
   "https.only443_title": "该代理的 CONNECT 只对 443 端口放行,只能用来访问 HTTPS 网站;当作通用 SOCKS5/任意端口转发的上游会失败",
 
   "pool.in_use": "使用中",
+  "pool.not_in_pool": "未使用",
   "pool.failed": "⚠️ 已失效({count} 次失败)",
+  "pool.failed_label": "已失效",
   "pool.failed_title": "连续转发失败次数过多,负载均衡时已跳过。可重新验证或从转发池移除",
+  "pool.add_one": "加入",
+  "pool.remove_one": "移除",
+  "pool.stats": "{success}/{total} 成功",
+  "pool.stats_none": "暂无请求",
 
   "job.submitted": "已提交,启动中...",
   "job.running": "运行中: {message}",
@@ -57,7 +75,7 @@
   "job.summary_scrape": "完成: 抓取 {scraped} / 去重 {unique} / 缓存复用 {reused} / 新验证 {fresh} / 存活 {alive}",
 
   "alert.select_validate": "请先勾选要验证的代理",
-  "alert.select_pool": "请先勾选要用于转发的代理",
+  "alert.select_pool": "请先勾选要加入转发池的代理",
   "alert.select_remove_pool": "请先勾选要从转发池移除的代理",
   "alert.select_delete": "请先勾选要删除的代理",
   "alert.validate_done": "验证完成: {checked} 个,存活 {alive} 个",
@@ -88,6 +106,7 @@
   "settings.sched_pool_topup_enabled": "转发池不足时自动补充延迟最低的代理",
   "settings.sched_pool_topup_interval": "检查间隔(小时)",
   "settings.sched_pool_topup_min_count": "低于多少个可用代理时补充",
+  "settings.sched_pool_https_only": "自动加入转发池时(定期刷新 + 自动补充)仅选择支持 HTTPS 的代理",
   "settings.sched_revalidate_enabled": "定期验证已有代理",
   "settings.sched_revalidate_interval": "验证间隔(小时)",
 

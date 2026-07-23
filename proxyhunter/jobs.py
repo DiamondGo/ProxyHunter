@@ -102,13 +102,15 @@ class JobRunner:
                 geo_verify_via_proxy=opts.get("geo_verify_via_proxy", False),
             )
             freshly_checked = validator.validate_all(to_check) if to_check else []
-            self._store.upsert_all(freshly_checked)
 
             alive = [p for p in freshly_checked if p.alive] + reused_alive
             if opts.get("geo_lookup", True):
                 self._set_message("filling in geo data...")
+                # Also covers reused_alive: a cached proxy carried over from a
+                # previous run may still be missing geo data itself.
                 fill_missing_geo(alive)
 
+            self._store.upsert_all(freshly_checked + reused_alive)
             self._store.save()
 
             self._finish_success(

@@ -89,7 +89,12 @@ class Scheduler:
         self._settings.update({"sched_pool_refresh_last_run": now})
 
         top_n = int(s.get("sched_pool_top_n") or 5)
-        candidates = [p for p in self._store.all_known_proxies() if p.alive and p.latency_ms is not None]
+        https_only = s.get("sched_pool_https_only", True)
+        candidates = [
+            p
+            for p in self._store.all_known_proxies()
+            if p.alive and p.latency_ms is not None and (not https_only or p.supports_https)
+        ]
         candidates.sort(key=lambda p: p.latency_ms)
         top = candidates[:top_n]
 
@@ -115,11 +120,15 @@ class Scheduler:
             return
 
         need = min_count - usable_count
+        https_only = s.get("sched_pool_https_only", True)
         existing_keys = {p.key_str() for p in self._pool.get_proxies()}
         candidates = [
             p
             for p in self._store.all_known_proxies()
-            if p.alive and p.latency_ms is not None and p.key_str() not in existing_keys
+            if p.alive
+            and p.latency_ms is not None
+            and p.key_str() not in existing_keys
+            and (not https_only or p.supports_https)
         ]
         candidates.sort(key=lambda p: p.latency_ms)
         to_add = candidates[:need]

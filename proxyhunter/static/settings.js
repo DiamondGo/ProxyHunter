@@ -57,6 +57,7 @@ function populateForm(settings) {
   form.sched_pool_topup_interval_hours.value = settings.sched_pool_topup_interval_hours ?? "";
   form.sched_pool_topup_min_count.value = settings.sched_pool_topup_min_count ?? "";
   document.getElementById("sched-pool-topup-last-run").textContent = fmtLastRun(settings.sched_pool_topup_last_run);
+  form.sched_pool_https_only.checked = !!settings.sched_pool_https_only;
 
   form.sched_revalidate_enabled.checked = !!settings.sched_revalidate_enabled;
   form.sched_revalidate_interval_hours.value = settings.sched_revalidate_interval_hours ?? "";
@@ -117,6 +118,7 @@ form.addEventListener("submit", async (e) => {
     sched_pool_topup_enabled: form.sched_pool_topup_enabled.checked,
     sched_pool_topup_interval_hours: form.sched_pool_topup_interval_hours.value,
     sched_pool_topup_min_count: form.sched_pool_topup_min_count.value,
+    sched_pool_https_only: form.sched_pool_https_only.checked,
     sched_revalidate_enabled: form.sched_revalidate_enabled.checked,
     sched_revalidate_interval_hours: form.sched_revalidate_interval_hours.value,
     ui_language: form.ui_language.value,

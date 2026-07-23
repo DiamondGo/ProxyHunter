@@ -23,6 +23,8 @@ REP_GENERAL_FAILURE = 0x01
 REP_COMMAND_NOT_SUPPORTED = 0x07
 REP_ADDRESS_TYPE_NOT_SUPPORTED = 0x08
 
+MAX_RETRIES = 3
+
 
 class _Socks5Handler(socketserver.BaseRequestHandler):
     pool: ProxyPool
@@ -44,22 +46,24 @@ class _Socks5Handler(socketserver.BaseRequestHandler):
         if target_host is None:
             return
 
-        upstream = self.pool.pick()
-        if upstream is None:
+        candidates = self.pool.pick_many(MAX_RETRIES + 1)
+        if not candidates:
             self._reply(client, REP_GENERAL_FAILURE)
             return
 
-        try:
-            remote = connect_via_upstream(upstream, target_host, target_port, timeout=self.timeout)
-        except (OSError, ConnectionError) as exc:
-            log.debug("socks upstream connect via %s:%s failed: %s", upstream.ip, upstream.port, exc)
-            self.pool.report_result(upstream, False)
-            self._reply(client, REP_GENERAL_FAILURE)
+        for upstream in candidates:
+            try:
+                remote = connect_via_upstream(upstream, target_host, target_port, timeout=self.timeout)
+            except (OSError, ConnectionError) as exc:
+                log.debug("socks upstream connect via %s:%s failed: %s", upstream.ip, upstream.port, exc)
+                self.pool.report_result(upstream, False)
+                continue
+            self.pool.report_result(upstream, True)
+            self._reply(client, REP_SUCCESS)
+            relay(client, remote)
             return
 
-        self.pool.report_result(upstream, True)
-        self._reply(client, REP_SUCCESS)
-        relay(client, remote)
+        self._reply(client, REP_GENERAL_FAILURE)
 
     def _negotiate_auth(self, client: socket.socket) -> bool:
         header = self._recvn(client, 2)

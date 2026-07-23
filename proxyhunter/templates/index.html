@@ -12,11 +12,12 @@
   <div class="toolbar">
     <button id="btn-scrape" data-i18n="toolbar.scrape">发起全量抓取+验证</button>
     <button id="btn-validate-selected" data-i18n="toolbar.validate_selected">验证选中项</button>
-    <button id="btn-set-pool" data-i18n="toolbar.set_pool">设为转发池</button>
+    <button id="btn-add-to-pool" data-i18n="toolbar.add_to_pool">加入转发池</button>
     <button class="secondary" id="btn-remove-from-pool" data-i18n="toolbar.remove_from_pool">从转发池移除选中项</button>
     <button class="secondary" id="btn-clear-pool" data-i18n="toolbar.clear_pool">清空转发池</button>
     <button class="danger" id="btn-delete-proxies" data-i18n="toolbar.delete_proxies">删除选中代理</button>
     <button class="secondary" id="btn-refresh" data-i18n="toolbar.refresh">刷新</button>
+    <button class="secondary" id="btn-toggle-filters" data-i18n="toolbar.filters">筛选</button>
     <a class="secondary btn-link" href="/settings" data-i18n="nav.settings">设置</a>
   </div>
 </header>
@@ -31,7 +32,19 @@
   <div id="forward-status" data-i18n="forward.loading">加载中...</div>
 </section>
 
+<section id="filter-panel" class="panel hidden">
+  <h2 data-i18n="filters.title">筛选条件</h2>
+  <div class="form-grid" id="filter-grid"></div>
+  <div class="toolbar">
+    <button type="button" class="secondary" id="btn-reset-filters" data-i18n="filters.reset">重置筛选</button>
+  </div>
+</section>
+
 <section class="panel">
+  <div class="view-tabs" id="view-tabs">
+    <button type="button" class="view-tab active" id="tab-view-all" data-i18n="tabs.all">全部代理</button>
+    <button type="button" class="view-tab" id="tab-view-pool" data-i18n="tabs.pool">转发池</button>
+  </div>
   <p class="hint" data-i18n="hint.https_443">⚠️ 仅443 = 该代理只允许 CONNECT 到 443 端口,只适合访问 HTTPS 网站,不要拿去当通用 SOCKS5/任意端口转发的上游。</p>
   <div class="table-toolbar">
     <label><input type="checkbox" id="chk-all"> <span data-i18n="table.select_all">全选/全不选</span></label>

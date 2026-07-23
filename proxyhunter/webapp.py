@@ -73,6 +73,8 @@ def create_app(store: ProxyStore, pool: ProxyPool, jobs: JobRunner, settings: Se
                         "selected": p.key_str() in selected_keys,
                         "pool_failed": pool_status.get(p.key_str(), {}).get("failed", False),
                         "pool_fail_count": pool_status.get(p.key_str(), {}).get("fail_count", 0),
+                        "pool_request_count": pool_status.get(p.key_str(), {}).get("request_count", 0),
+                        "pool_success_count": pool_status.get(p.key_str(), {}).get("success_count", 0),
                     }
                     for p in proxies
                 ],
@@ -142,7 +144,13 @@ def create_app(store: ProxyStore, pool: ProxyPool, jobs: JobRunner, settings: Se
         return jsonify(
             {
                 "selected": [
-                    {"key": p.key_str(), **pool_status.get(p.key_str(), {"failed": False, "fail_count": 0})}
+                    {
+                        "key": p.key_str(),
+                        **pool_status.get(
+                            p.key_str(),
+                            {"failed": False, "fail_count": 0, "request_count": 0, "success_count": 0, "failure_count": 0},
+                        ),
+                    }
                     for p in selected
                 ],
                 "count": len(selected),
@@ -161,6 +169,21 @@ def create_app(store: ProxyStore, pool: ProxyPool, jobs: JobRunner, settings: Se
         pool.set_proxies(proxies)
         settings.update({"selected_keys": [p.key_str() for p in proxies]})
         return jsonify({"count": len(proxies)})
+
+    @app.post("/api/forward/add")
+    def forward_add():
+        """Merge the given proxies into the existing pool, deduped by key -
+        unlike /api/forward/select this never drops proxies already in the pool."""
+        body = request.get_json(silent=True) or {}
+        keys = body.get("keys") or []
+        proxies = [p for p in (store.get_by_key(k) for k in keys) if p is not None]
+        merged = {p.key_str(): p for p in pool.get_proxies()}
+        for p in proxies:
+            merged[p.key_str()] = p
+        result = list(merged.values())
+        pool.set_proxies(result)
+        settings.update({"selected_keys": [p.key_str() for p in result]})
+        return jsonify({"count": len(result)})
 
     @app.post("/api/forward/remove")
     def forward_remove():

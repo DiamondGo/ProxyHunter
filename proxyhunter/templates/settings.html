@@ -43,7 +43,7 @@
         <input type="number" name="workers" min="1" max="500">
       </label>
       <label><span data-i18n="settings.timeout">单个请求超时(秒)</span>
-        <input type="number" name="timeout" min="1" max="120" step="0.5">
+        <input type="number" name="timeout" min="1" max="120" step="any">
       </label>
       <label class="checkbox-line">
         <input type="checkbox" name="secondary_check"> <span data-i18n="settings.secondary_check">启用二次站点交叉验证</span>
@@ -55,7 +55,7 @@
         <input type="checkbox" name="geo_verify_via_proxy"> <span data-i18n="settings.geo_verify_via_proxy">使用网络服务来确认代理位置(经代理连接第三方服务确认真实出口位置,更准确但更慢)</span>
       </label>
       <label><span data-i18n="settings.recheck_after">复用近期结果窗口(小时)</span>
-        <input type="number" name="recheck_after" min="0" step="0.5">
+        <input type="number" name="recheck_after" min="0" step="any">
       </label>
       <label><span data-i18n="settings.limit">单次抓取验证数量上限(留空 = 不限)</span>
         <input type="number" name="limit" min="1">
@@ -70,7 +70,7 @@
         <input type="checkbox" name="sched_full_scrape_enabled"> <span data-i18n="settings.sched_full_scrape_enabled">定期全量抓取并验证</span>
       </label>
       <label><span data-i18n="settings.sched_full_scrape_interval">抓取间隔(小时)</span>
-        <input type="number" name="sched_full_scrape_interval_hours" min="0.1" step="0.5">
+        <input type="number" name="sched_full_scrape_interval_hours" min="0.1" step="any">
       </label>
       <div class="sched-status" id="sched-full-scrape-last-run"></div>
 
@@ -78,7 +78,7 @@
         <input type="checkbox" name="sched_pool_refresh_enabled"> <span data-i18n="settings.sched_pool_refresh_enabled">定期将延迟最短的代理加入转发池(与现有转发池合并去重)</span>
       </label>
       <label><span data-i18n="settings.sched_pool_refresh_interval">刷新间隔(小时)</span>
-        <input type="number" name="sched_pool_refresh_interval_hours" min="0.05" step="0.5">
+        <input type="number" name="sched_pool_refresh_interval_hours" min="0.05" step="any">
       </label>
       <label><span data-i18n="settings.sched_pool_top_n">每次加入延迟最短的前 N 个</span>
         <input type="number" name="sched_pool_top_n" min="1">
@@ -89,18 +89,22 @@
         <input type="checkbox" name="sched_pool_topup_enabled"> <span data-i18n="settings.sched_pool_topup_enabled">转发池不足时自动补充延迟最低的代理</span>
       </label>
       <label><span data-i18n="settings.sched_pool_topup_interval">检查间隔(小时)</span>
-        <input type="number" name="sched_pool_topup_interval_hours" min="0.05" step="0.5">
+        <input type="number" name="sched_pool_topup_interval_hours" min="0.05" step="any">
       </label>
       <label><span data-i18n="settings.sched_pool_topup_min_count">低于多少个可用代理时补充</span>
         <input type="number" name="sched_pool_topup_min_count" min="1">
       </label>
       <div class="sched-status" id="sched-pool-topup-last-run"></div>
 
+      <label class="checkbox-line sub-option">
+        <input type="checkbox" name="sched_pool_https_only"> <span data-i18n="settings.sched_pool_https_only">自动加入转发池时(定期刷新 + 自动补充)仅选择支持 HTTPS 的代理</span>
+      </label>
+
       <label class="checkbox-line">
         <input type="checkbox" name="sched_revalidate_enabled"> <span data-i18n="settings.sched_revalidate_enabled">定期验证已有代理</span>
       </label>
       <label><span data-i18n="settings.sched_revalidate_interval">验证间隔(小时)</span>
-        <input type="number" name="sched_revalidate_interval_hours" min="0.1" step="0.5">
+        <input type="number" name="sched_revalidate_interval_hours" min="0.1" step="any">
       </label>
       <div class="sched-status" id="sched-revalidate-last-run"></div>
     </div>

@@ -12,6 +12,7 @@ from proxyhunter.settings import SettingsStore
 log = logging.getLogger(__name__)
 
 MAX_HEAD_BYTES = 1 << 20
+MAX_RETRIES = 3
 
 
 class _HttpProxyHandler(socketserver.BaseRequestHandler):
@@ -38,37 +39,42 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
         except ValueError:
             return
 
-        upstream = self.pool.pick()
-        if upstream is None:
-            self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
-            return
-
         try:
             if method == b"CONNECT":
-                self._handle_connect(client, upstream, target)
+                self._handle_connect(client, target)
             else:
-                self._handle_plain(client, upstream, method, target, header_block, leftover)
+                self._handle_plain(client, method, target, header_block, leftover)
         except (OSError, ConnectionError) as exc:
-            log.debug("proxy handling error via %s:%s: %s", upstream.ip, upstream.port, exc)
+            log.debug("proxy handling error: %s", exc)
 
-    def _handle_connect(self, client: socket.socket, upstream, target: bytes) -> None:
+    def _handle_connect(self, client: socket.socket, target: bytes) -> None:
         host_b, _, port_b = target.partition(b":")
         host = host_b.decode()
         port = int(port_b) if port_b else 443
-        try:
-            remote = connect_via_upstream(upstream, host, port, timeout=self.timeout)
-        except (OSError, ConnectionError) as exc:
-            self.pool.report_result(upstream, False)
-            self._send_error(client, 502, f"upstream connect failed: {exc}")
+
+        candidates = self.pool.pick_many(MAX_RETRIES + 1)
+        if not candidates:
+            self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
             return
-        self.pool.report_result(upstream, True)
-        client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-        relay(client, remote)
+
+        last_exc: Exception | None = None
+        for upstream in candidates:
+            try:
+                remote = connect_via_upstream(upstream, host, port, timeout=self.timeout)
+            except (OSError, ConnectionError) as exc:
+                self.pool.report_result(upstream, False)
+                last_exc = exc
+                continue
+            self.pool.report_result(upstream, True)
+            client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            relay(client, remote)
+            return
+
+        self._send_error(client, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}")
 
     def _handle_plain(
         self,
         client: socket.socket,
-        upstream,
         method: bytes,
         target: bytes,
         header_block: bytes,
@@ -87,33 +93,43 @@ class _HttpProxyHandler(socketserver.BaseRequestHandler):
         else:
             host, port = host_port, 80
 
-        if upstream.protocol in ("socks4", "socks5"):
-            # SOCKS upstreams only tunnel raw TCP, so we connect straight to the
-            # origin server and rewrite the request line to origin-form.
-            try:
-                remote = connect_via_upstream(upstream, host, port, timeout=self.timeout)
-            except (OSError, ConnectionError) as exc:
-                self.pool.report_result(upstream, False)
-                self._send_error(client, 502, f"upstream connect failed: {exc}")
-                return
-            self.pool.report_result(upstream, True)
-            request_line = f"{method.decode()} {path} HTTP/1.1\r\n".encode()
-        else:
-            # http/https upstreams are real forward proxies: hand them the
-            # original absolute-form request line as-is.
-            try:
-                remote = socket.create_connection((upstream.ip, upstream.port), timeout=self.timeout)
-            except OSError as exc:
-                self.pool.report_result(upstream, False)
-                self._send_error(client, 502, f"upstream connect failed: {exc}")
-                return
-            self.pool.report_result(upstream, True)
-            request_line = method + b" " + target + b" HTTP/1.1\r\n"
+        candidates = self.pool.pick_many(MAX_RETRIES + 1)
+        if not candidates:
+            self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
+            return
 
-        remote.sendall(request_line + header_block)
-        if leftover:
-            remote.sendall(leftover)
-        relay(client, remote)
+        last_exc: Exception | None = None
+        for upstream in candidates:
+            if upstream.protocol in ("socks4", "socks5"):
+                # SOCKS upstreams only tunnel raw TCP, so we connect straight to the
+                # origin server and rewrite the request line to origin-form.
+                try:
+                    remote = connect_via_upstream(upstream, host, port, timeout=self.timeout)
+                except (OSError, ConnectionError) as exc:
+                    self.pool.report_result(upstream, False)
+                    last_exc = exc
+                    continue
+                self.pool.report_result(upstream, True)
+                request_line = f"{method.decode()} {path} HTTP/1.1\r\n".encode()
+            else:
+                # http/https upstreams are real forward proxies: hand them the
+                # original absolute-form request line as-is.
+                try:
+                    remote = socket.create_connection((upstream.ip, upstream.port), timeout=self.timeout)
+                except OSError as exc:
+                    self.pool.report_result(upstream, False)
+                    last_exc = exc
+                    continue
+                self.pool.report_result(upstream, True)
+                request_line = method + b" " + target + b" HTTP/1.1\r\n"
+
+            remote.sendall(request_line + header_block)
+            if leftover:
+                remote.sendall(leftover)
+            relay(client, remote)
+            return
+
+        self._send_error(client, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}")
 
     @staticmethod
     def _read_until_headers_end(client: socket.socket) -> tuple[bytes, bytes]:
