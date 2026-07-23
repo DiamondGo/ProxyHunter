@@ -193,6 +193,15 @@ def create_app(store: ProxyStore, pool: ProxyPool, jobs: JobRunner, settings: Se
         settings.update({"selected_keys": [p.key_str() for p in pool.get_proxies()]})
         return jsonify({"count": len(pool.get_proxies())})
 
+    @app.post("/api/forward/reactivate")
+    def forward_reactivate():
+        """Manually clear a pool proxy's failed/fail-count state without
+        re-validating it, so it's picked by the load balancer again."""
+        body = request.get_json(silent=True) or {}
+        keys = body.get("keys") or []
+        pool.clear_failed(keys)
+        return jsonify({"status": pool.get_status()})
+
     @app.get("/api/settings")
     def get_settings():
         current = settings.snapshot()

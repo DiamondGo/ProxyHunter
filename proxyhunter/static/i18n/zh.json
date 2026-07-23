@@ -64,6 +64,7 @@
   "pool.failed_title": "连续转发失败次数过多,负载均衡时已跳过。可重新验证或从转发池移除",
   "pool.add_one": "加入",
   "pool.remove_one": "移除",
+  "pool.enable_one": "启用",
   "pool.stats": "{success}/{total} 成功",
   "pool.stats_none": "暂无请求",
 

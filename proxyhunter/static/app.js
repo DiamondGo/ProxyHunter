@@ -73,7 +73,8 @@ function fmtPoolStatus(p) {
     : `<button type="button" class="pool-action-btn secondary" data-key="${p.key}" data-action="add">${t("pool.add_one")}</button>`;
   if (!p.selected) return btn;
   if (p.pool_failed) {
-    return `<span class="warn-badge" title="${t("pool.failed_title")}">${t("pool.failed", { count: p.pool_fail_count })}</span>${btn}`;
+    const enableBtn = `<button type="button" class="pool-action-btn secondary" data-key="${p.key}" data-action="enable">${t("pool.enable_one")}</button>`;
+    return `<span class="warn-badge" title="${t("pool.failed_title")}">${t("pool.failed", { count: p.pool_fail_count })}</span>${enableBtn}${btn}`;
   }
   return `${t("pool.in_use")}${btn}`;
 }
@@ -786,9 +787,10 @@ document.getElementById("proxy-tbody").addEventListener("click", async (e) => {
   if (!btn) return;
   const key = btn.dataset.key;
   const action = btn.dataset.action;
+  const url = { add: "/api/forward/add", remove: "/api/forward/remove", enable: "/api/forward/reactivate" }[action];
   btn.disabled = true;
   try {
-    await fetchJSON(action === "add" ? "/api/forward/add" : "/api/forward/remove", {
+    await fetchJSON(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ keys: [key] }),

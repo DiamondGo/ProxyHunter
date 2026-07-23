@@ -64,6 +64,7 @@
   "pool.failed_title": "Too many consecutive forwarding failures, skipped during load balancing. Re-validate or remove from the forward pool",
   "pool.add_one": "Add",
   "pool.remove_one": "Remove",
+  "pool.enable_one": "Enable",
   "pool.stats": "{success}/{total} succeeded",
   "pool.stats_none": "No requests yet",
 
