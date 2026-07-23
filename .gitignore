@@ -1,0 +1,25 @@
+# Python environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+
+# Personal / runtime data (scraped proxies, settings, scrape output)
+proxyhunter_state.json
+proxyhunter_settings.json
+output/
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Claude Code local settings
+.claude/

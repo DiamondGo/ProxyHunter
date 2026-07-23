@@ -1,0 +1,189 @@
+:root {
+  --bg: #f7f7f9;
+  --panel-bg: #ffffff;
+  --text: #1d1f24;
+  --muted: #6b7280;
+  --border: #e2e4e9;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --alive: #16a34a;
+  --dead: #dc2626;
+  --row-hover: #f0f4ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --panel-bg: #1c1f26;
+    --text: #e6e8eb;
+    --muted: #9aa1ac;
+    --border: #2b2f38;
+    --accent: #3b82f6;
+    --accent-contrast: #0b1220;
+    --alive: #4ade80;
+    --dead: #f87171;
+    --row-hover: #23283340;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 24px;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+button {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: default; }
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+button.danger { background: var(--dead); color: #ffffff; }
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.panel.hidden { display: none; }
+
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel-bg); }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+tr:hover td { background: var(--row-hover); }
+
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.dot.alive { background: var(--alive); }
+.dot.dead { background: var(--dead); }
+
+.warn-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: help;
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fde68a;
+}
+@media (prefers-color-scheme: dark) {
+  .warn-badge { background: #451a03; color: #fde68a; border-color: #78350f; }
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+code { background: var(--row-hover); padding: 2px 6px; border-radius: 4px; }
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fef3c7;
+  color: #78350f;
+  border-color: #fde68a;
+}
+@media (prefers-color-scheme: dark) {
+  .banner { background: #451a03; color: #fde68a; border-color: #78350f; }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px 20px;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.form-grid label.checkbox-line {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-grid input[type="text"],
+.form-grid input[type="number"] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.checkbox-row label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+
+.sched-status {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -8px;
+}
+
+#save-status { font-size: 13px; }
+
+.hint { font-size: 12px; color: var(--muted); margin: -6px 0 12px; }

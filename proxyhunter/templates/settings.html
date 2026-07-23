@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN" data-i18n-doc-title="doc_title_settings">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProxyHunter 设置</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1 data-i18n="doc_title_settings">ProxyHunter 设置</h1>
+  <div class="toolbar">
+    <a class="secondary btn-link" href="/" data-i18n="nav.back_to_dashboard">返回仪表盘</a>
+  </div>
+</header>
+
+<section id="restart-banner" class="panel banner hidden">
+  <div id="restart-banner-text"></div>
+  <button id="btn-restart-now" data-i18n="settings.restart_now">立即重启服务</button>
+</section>
+
+<form id="settings-form">
+  <section class="panel">
+    <h2 data-i18n="settings.section_scrape">抓取 / 验证设置(保存后立即生效,无需重启)</h2>
+    <div class="form-grid">
+      <label><span data-i18n="settings.sources">数据源</span>
+        <span class="checkbox-row">
+          <label><input type="checkbox" name="sources" value="freeproxy_world"> freeproxy.world</label>
+          <label><input type="checkbox" name="sources" value="proxyscrape"> proxyscrape.com</label>
+        </span>
+      </label>
+      <label><span data-i18n="settings.pages">freeproxy.world 抓取页数</span>
+        <input type="number" name="pages" min="1" max="966">
+      </label>
+      <label><span data-i18n="settings.protocols">协议(proxyscrape.com)</span>
+        <span class="checkbox-row">
+          <label><input type="checkbox" name="protocols" value="http"> http</label>
+          <label><input type="checkbox" name="protocols" value="socks4"> socks4</label>
+          <label><input type="checkbox" name="protocols" value="socks5"> socks5</label>
+        </span>
+      </label>
+      <label><span data-i18n="settings.workers">并发验证数 (workers)</span>
+        <input type="number" name="workers" min="1" max="500">
+      </label>
+      <label><span data-i18n="settings.timeout">单个请求超时(秒)</span>
+        <input type="number" name="timeout" min="1" max="120" step="0.5">
+      </label>
+      <label class="checkbox-line">
+        <input type="checkbox" name="secondary_check"> <span data-i18n="settings.secondary_check">启用二次站点交叉验证</span>
+      </label>
+      <label class="checkbox-line">
+        <input type="checkbox" name="geo_lookup"> <span data-i18n="settings.geo_lookup">自动补全地理位置(直连 ip-api.com,不经过代理)</span>
+      </label>
+      <label class="checkbox-line">
+        <input type="checkbox" name="geo_verify_via_proxy"> <span data-i18n="settings.geo_verify_via_proxy">使用网络服务来确认代理位置(经代理连接第三方服务确认真实出口位置,更准确但更慢)</span>
+      </label>
+      <label><span data-i18n="settings.recheck_after">复用近期结果窗口(小时)</span>
+        <input type="number" name="recheck_after" min="0" step="0.5">
+      </label>
+      <label><span data-i18n="settings.limit">单次抓取验证数量上限(留空 = 不限)</span>
+        <input type="number" name="limit" min="1">
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 data-i18n="settings.section_scheduled">定时任务(保存后立即生效,无需重启)</h2>
+    <div class="form-grid">
+      <label class="checkbox-line">
+        <input type="checkbox" name="sched_full_scrape_enabled"> <span data-i18n="settings.sched_full_scrape_enabled">定期全量抓取并验证</span>
+      </label>
+      <label><span data-i18n="settings.sched_full_scrape_interval">抓取间隔(小时)</span>
+        <input type="number" name="sched_full_scrape_interval_hours" min="0.1" step="0.5">
+      </label>
+      <div class="sched-status" id="sched-full-scrape-last-run"></div>
+
+      <label class="checkbox-line">
+        <input type="checkbox" name="sched_pool_refresh_enabled"> <span data-i18n="settings.sched_pool_refresh_enabled">定期将延迟最短的代理加入转发池(与现有转发池合并去重)</span>
+      </label>
+      <label><span data-i18n="settings.sched_pool_refresh_interval">刷新间隔(小时)</span>
+        <input type="number" name="sched_pool_refresh_interval_hours" min="0.05" step="0.5">
+      </label>
+      <label><span data-i18n="settings.sched_pool_top_n">每次加入延迟最短的前 N 个</span>
+        <input type="number" name="sched_pool_top_n" min="1">
+      </label>
+      <div class="sched-status" id="sched-pool-refresh-last-run"></div>
+
+      <label class="checkbox-line">
+        <input type="checkbox" name="sched_pool_topup_enabled"> <span data-i18n="settings.sched_pool_topup_enabled">转发池不足时自动补充延迟最低的代理</span>
+      </label>
+      <label><span data-i18n="settings.sched_pool_topup_interval">检查间隔(小时)</span>
+        <input type="number" name="sched_pool_topup_interval_hours" min="0.05" step="0.5">
+      </label>
+      <label><span data-i18n="settings.sched_pool_topup_min_count">低于多少个可用代理时补充</span>
+        <input type="number" name="sched_pool_topup_min_count" min="1">
+      </label>
+      <div class="sched-status" id="sched-pool-topup-last-run"></div>
+
+      <label class="checkbox-line">
+        <input type="checkbox" name="sched_revalidate_enabled"> <span data-i18n="settings.sched_revalidate_enabled">定期验证已有代理</span>
+      </label>
+      <label><span data-i18n="settings.sched_revalidate_interval">验证间隔(小时)</span>
+        <input type="number" name="sched_revalidate_interval_hours" min="0.1" step="0.5">
+      </label>
+      <div class="sched-status" id="sched-revalidate-last-run"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 data-i18n="settings.section_interface">界面设置(保存后立即生效,无需重启)</h2>
+    <div class="form-grid">
+      <label><span data-i18n="settings.ui_language">界面语言</span>
+        <select name="ui_language" id="ui-language-select"></select>
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 data-i18n="settings.section_network">网络设置(保存后需要重启服务才能生效)</h2>
+    <div class="form-grid">
+      <label><span data-i18n="settings.ui_host">Web 控制台监听地址</span>
+        <input type="text" name="ui_host">
+      </label>
+      <label><span data-i18n="settings.ui_port">Web 控制台端口</span>
+        <input type="number" name="ui_port" min="1" max="65535">
+      </label>
+      <label><span data-i18n="settings.forward_host">本地转发代理监听地址</span>
+        <input type="text" name="forward_host">
+      </label>
+      <label><span data-i18n="settings.http_proxy_port">本地 HTTP 转发代理端口</span>
+        <input type="number" name="http_proxy_port" min="1" max="65535">
+      </label>
+      <label><span data-i18n="settings.socks_port">本地 SOCKS5 转发代理端口</span>
+        <input type="number" name="socks_port" min="1" max="65535">
+      </label>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <button type="submit" data-i18n="settings.save">保存设置</button>
+    <button type="button" class="secondary" id="btn-restart" data-i18n="settings.restart_service">重启服务</button>
+  </div>
+</form>
+
+<div id="save-status" class="panel hidden"></div>
+
+<script src="/static/i18n.js"></script>
+<script src="/static/settings.js"></script>
+</body>
+</html>

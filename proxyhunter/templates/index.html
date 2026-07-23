@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN" data-i18n-doc-title="doc_title_dashboard">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProxyHunter Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>ProxyHunter</h1>
+  <div class="toolbar">
+    <button id="btn-scrape" data-i18n="toolbar.scrape">发起全量抓取+验证</button>
+    <button id="btn-validate-selected" data-i18n="toolbar.validate_selected">验证选中项</button>
+    <button id="btn-set-pool" data-i18n="toolbar.set_pool">设为转发池</button>
+    <button class="secondary" id="btn-remove-from-pool" data-i18n="toolbar.remove_from_pool">从转发池移除选中项</button>
+    <button class="secondary" id="btn-clear-pool" data-i18n="toolbar.clear_pool">清空转发池</button>
+    <button class="danger" id="btn-delete-proxies" data-i18n="toolbar.delete_proxies">删除选中代理</button>
+    <button class="secondary" id="btn-refresh" data-i18n="toolbar.refresh">刷新</button>
+    <a class="secondary btn-link" href="/settings" data-i18n="nav.settings">设置</a>
+  </div>
+</header>
+
+<section id="job-status" class="panel hidden"></section>
+<section id="pool-warning" class="panel banner hidden" data-i18n="pool_warning">
+  ⚠️ 转发池中没有可用代理了(全部已失效),本地代理现在无法转发流量。请重新验证或移除失效代理,或重新选择转发池。
+</section>
+
+<section class="panel">
+  <h2 data-i18n="forward.title">本地转发代理</h2>
+  <div id="forward-status" data-i18n="forward.loading">加载中...</div>
+</section>
+
+<section class="panel">
+  <p class="hint" data-i18n="hint.https_443">⚠️ 仅443 = 该代理只允许 CONNECT 到 443 端口,只适合访问 HTTPS 网站,不要拿去当通用 SOCKS5/任意端口转发的上游。</p>
+  <div class="table-toolbar">
+    <label><input type="checkbox" id="chk-all"> <span data-i18n="table.select_all">全选/全不选</span></label>
+    <span id="proxy-count"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="proxy-table">
+      <thead>
+        <tr id="proxy-thead-row">
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="proxy-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<script src="/static/i18n.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

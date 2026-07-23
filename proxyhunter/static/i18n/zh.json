@@ -1,0 +1,118 @@
+{
+  "doc_title_dashboard": "ProxyHunter 控制台",
+  "doc_title_settings": "ProxyHunter 设置",
+
+  "nav.settings": "设置",
+  "nav.back_to_dashboard": "返回仪表盘",
+
+  "toolbar.scrape": "发起全量抓取+验证",
+  "toolbar.validate_selected": "验证选中项",
+  "toolbar.validating": "验证中...",
+  "toolbar.set_pool": "设为转发池",
+  "toolbar.remove_from_pool": "从转发池移除选中项",
+  "toolbar.clear_pool": "清空转发池",
+  "toolbar.delete_proxies": "删除选中代理",
+  "toolbar.refresh": "刷新",
+
+  "pool_warning": "⚠️ 转发池中没有可用代理了(全部已失效),本地代理现在无法转发流量。请重新验证或移除失效代理,或重新选择转发池。",
+
+  "forward.title": "本地转发代理",
+  "forward.loading": "加载中...",
+  "forward.status_line": "HTTP 代理: <code>{http}</code> &nbsp;|&nbsp; SOCKS5 代理: <code>{socks}</code> &nbsp;|&nbsp; 当前转发池: {count} 个代理(可用 {usable} 个)",
+
+  "hint.https_443": "⚠️ 仅443 = 该代理只允许 CONNECT 到 443 端口,只适合访问 HTTPS 网站,不要拿去当通用 SOCKS5/任意端口转发的上游。",
+
+  "table.select_all": "全选/全不选",
+  "table.count": "共 {total} 条,已选 {selected} 条",
+
+  "col.status": "状态",
+  "col.address": "地址",
+  "col.protocol": "协议",
+  "col.location": "国家/城市",
+  "col.isp": "ISP",
+  "col.latency": "延迟(ms)",
+  "col.https": "HTTPS",
+  "col.anonymity": "匿名度",
+  "col.source": "来源",
+  "col.checked_at": "最近检测",
+  "col.pool": "转发池",
+
+  "status.alive": "存活",
+  "status.dead": "失败",
+
+  "https.yes": "是",
+  "https.no": "否",
+  "https.only443_label": "⚠️ 仅443",
+  "https.only443_title": "该代理的 CONNECT 只对 443 端口放行,只能用来访问 HTTPS 网站;当作通用 SOCKS5/任意端口转发的上游会失败",
+
+  "pool.in_use": "使用中",
+  "pool.failed": "⚠️ 已失效({count} 次失败)",
+  "pool.failed_title": "连续转发失败次数过多,负载均衡时已跳过。可重新验证或从转发池移除",
+
+  "job.submitted": "已提交,启动中...",
+  "job.running": "运行中: {message}",
+  "job.revalidate_running": "定时验证运行中: {message}",
+  "job.failed": "任务失败: {error}",
+  "job.summary_revalidate": "验证完成: 共 {checked} 个 / 存活 {alive}",
+  "job.summary_scrape": "完成: 抓取 {scraped} / 去重 {unique} / 缓存复用 {reused} / 新验证 {fresh} / 存活 {alive}",
+
+  "alert.select_validate": "请先勾选要验证的代理",
+  "alert.select_pool": "请先勾选要用于转发的代理",
+  "alert.select_remove_pool": "请先勾选要从转发池移除的代理",
+  "alert.select_delete": "请先勾选要删除的代理",
+  "alert.validate_done": "验证完成: {checked} 个,存活 {alive} 个",
+  "alert.deleted": "已删除 {count} 个代理",
+  "confirm.delete_proxies": "确定要从代理列表中永久删除选中的 {count} 个代理吗?如果它们在转发池中,也会一并从转发池移除。",
+
+  "settings.section_scrape": "抓取 / 验证设置(保存后立即生效,无需重启)",
+  "settings.section_scheduled": "定时任务(保存后立即生效,无需重启)",
+  "settings.section_network": "网络设置(保存后需要重启服务才能生效)",
+  "settings.section_interface": "界面设置(保存后立即生效,无需重启)",
+
+  "settings.sources": "数据源",
+  "settings.pages": "freeproxy.world 抓取页数",
+  "settings.protocols": "协议(proxyscrape.com)",
+  "settings.workers": "并发验证数 (workers)",
+  "settings.timeout": "单个请求超时(秒)",
+  "settings.secondary_check": "启用二次站点交叉验证",
+  "settings.geo_lookup": "自动补全地理位置(直连 ip-api.com,不经过代理)",
+  "settings.geo_verify_via_proxy": "使用网络服务来确认代理位置(经代理连接第三方服务确认真实出口位置,更准确但更慢)",
+  "settings.recheck_after": "复用近期结果窗口(小时)",
+  "settings.limit": "单次抓取验证数量上限(留空 = 不限)",
+
+  "settings.sched_full_scrape_enabled": "定期全量抓取并验证",
+  "settings.sched_full_scrape_interval": "抓取间隔(小时)",
+  "settings.sched_pool_refresh_enabled": "定期将延迟最短的代理加入转发池(与现有转发池合并去重)",
+  "settings.sched_pool_refresh_interval": "刷新间隔(小时)",
+  "settings.sched_pool_top_n": "每次加入延迟最短的前 N 个",
+  "settings.sched_pool_topup_enabled": "转发池不足时自动补充延迟最低的代理",
+  "settings.sched_pool_topup_interval": "检查间隔(小时)",
+  "settings.sched_pool_topup_min_count": "低于多少个可用代理时补充",
+  "settings.sched_revalidate_enabled": "定期验证已有代理",
+  "settings.sched_revalidate_interval": "验证间隔(小时)",
+
+  "settings.ui_host": "Web 控制台监听地址",
+  "settings.ui_port": "Web 控制台端口",
+  "settings.forward_host": "本地转发代理监听地址",
+  "settings.http_proxy_port": "本地 HTTP 转发代理端口",
+  "settings.socks_port": "本地 SOCKS5 转发代理端口",
+
+  "settings.ui_language": "界面语言",
+
+  "settings.save": "保存设置",
+  "settings.restart_service": "重启服务",
+  "settings.restart_now": "立即重启服务",
+
+  "sched.never_run": "从未运行过",
+  "sched.last_run": "上次运行: {time}",
+
+  "restart.network_pending": "网络设置已修改但服务尚未重启,当前仍在用旧的地址/端口运行。",
+  "restart.network_saved": "网络设置已保存,需要重启服务才能生效。",
+  "restart.confirm": "确定要重启服务吗?重启期间页面会短暂断开连接,几秒后会自动刷新。",
+  "restart.restarting": "正在重启服务...",
+  "restart.reconnect_failed": "服务重启后未能自动连上,请手动刷新页面。",
+
+  "save.success_restart": "已保存。以下设置需要重启服务才能生效: {fields}",
+  "save.success": "已保存,立即生效。",
+  "save.error": "保存失败: {error}"
+}

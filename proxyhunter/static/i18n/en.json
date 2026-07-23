@@ -1,0 +1,118 @@
+{
+  "doc_title_dashboard": "ProxyHunter Dashboard",
+  "doc_title_settings": "ProxyHunter Settings",
+
+  "nav.settings": "Settings",
+  "nav.back_to_dashboard": "Back to Dashboard",
+
+  "toolbar.scrape": "Full Scrape + Validate",
+  "toolbar.validate_selected": "Validate Selected",
+  "toolbar.validating": "Validating...",
+  "toolbar.set_pool": "Set as Forward Pool",
+  "toolbar.remove_from_pool": "Remove Selected from Pool",
+  "toolbar.clear_pool": "Clear Pool",
+  "toolbar.delete_proxies": "Delete Selected",
+  "toolbar.refresh": "Refresh",
+
+  "pool_warning": "⚠️ No usable proxies left in the forward pool (all have failed) - the local proxy can't forward traffic right now. Re-validate or remove the failed proxies, or pick a new pool.",
+
+  "forward.title": "Local Forward Proxies",
+  "forward.loading": "Loading...",
+  "forward.status_line": "HTTP proxy: <code>{http}</code> &nbsp;|&nbsp; SOCKS5 proxy: <code>{socks}</code> &nbsp;|&nbsp; Current pool: {count} proxies ({usable} usable)",
+
+  "hint.https_443": "⚠️ 443-only = this proxy only allows CONNECT to port 443, so it's only good for HTTPS sites - don't use it as a general-purpose SOCKS5/any-port upstream.",
+
+  "table.select_all": "Select All / None",
+  "table.count": "{total} total, {selected} selected",
+
+  "col.status": "Status",
+  "col.address": "Address",
+  "col.protocol": "Protocol",
+  "col.location": "Country/City",
+  "col.isp": "ISP",
+  "col.latency": "Latency (ms)",
+  "col.https": "HTTPS",
+  "col.anonymity": "Anonymity",
+  "col.source": "Source",
+  "col.checked_at": "Last Checked",
+  "col.pool": "Forward Pool",
+
+  "status.alive": "Alive",
+  "status.dead": "Dead",
+
+  "https.yes": "Yes",
+  "https.no": "No",
+  "https.only443_label": "⚠️ 443-only",
+  "https.only443_title": "This proxy's CONNECT only allows port 443, so it can only reach HTTPS sites; using it as a general SOCKS5/any-port upstream will fail",
+
+  "pool.in_use": "In use",
+  "pool.failed": "⚠️ Failed ({count} failures)",
+  "pool.failed_title": "Too many consecutive forwarding failures, skipped during load balancing. Re-validate or remove from the forward pool",
+
+  "job.submitted": "Submitted, starting...",
+  "job.running": "Running: {message}",
+  "job.revalidate_running": "Scheduled revalidation running: {message}",
+  "job.failed": "Task failed: {error}",
+  "job.summary_revalidate": "Validation complete: {checked} checked / {alive} alive",
+  "job.summary_scrape": "Done: scraped {scraped} / unique {unique} / reused {reused} / freshly checked {fresh} / alive {alive}",
+
+  "alert.select_validate": "Please select proxies to validate first",
+  "alert.select_pool": "Please select proxies to use for forwarding first",
+  "alert.select_remove_pool": "Please select proxies to remove from the pool first",
+  "alert.select_delete": "Please select proxies to delete first",
+  "alert.validate_done": "Validation complete: {checked} checked, {alive} alive",
+  "alert.deleted": "Deleted {count} proxies",
+  "confirm.delete_proxies": "Permanently delete the selected {count} proxies from the list? If they're in the forward pool, they'll be removed from there too.",
+
+  "settings.section_scrape": "Scrape / Validation Settings (applies immediately, no restart needed)",
+  "settings.section_scheduled": "Scheduled Tasks (applies immediately, no restart needed)",
+  "settings.section_network": "Network Settings (requires a service restart to take effect)",
+  "settings.section_interface": "Interface Settings (applies immediately, no restart needed)",
+
+  "settings.sources": "Sources",
+  "settings.pages": "freeproxy.world pages to scrape",
+  "settings.protocols": "Protocols (proxyscrape.com)",
+  "settings.workers": "Concurrent validation workers",
+  "settings.timeout": "Per-request timeout (seconds)",
+  "settings.secondary_check": "Enable secondary cross-site validation",
+  "settings.geo_lookup": "Auto-fill geolocation (direct to ip-api.com, no proxy)",
+  "settings.geo_verify_via_proxy": "Confirm proxy location via a network service (connects through the proxy to a third-party service for a more accurate but slower exit-location check)",
+  "settings.recheck_after": "Reuse recent results window (hours)",
+  "settings.limit": "Max proxies per scrape/validate run (blank = unlimited)",
+
+  "settings.sched_full_scrape_enabled": "Periodic full scrape and validation",
+  "settings.sched_full_scrape_interval": "Scrape interval (hours)",
+  "settings.sched_pool_refresh_enabled": "Periodically add the lowest-latency proxies to the pool (merged and deduped with the existing pool)",
+  "settings.sched_pool_refresh_interval": "Refresh interval (hours)",
+  "settings.sched_pool_top_n": "Add the top N lowest-latency proxies each time",
+  "settings.sched_pool_topup_enabled": "Auto top-up with the lowest-latency proxies when the pool runs short",
+  "settings.sched_pool_topup_interval": "Check interval (hours)",
+  "settings.sched_pool_topup_min_count": "Top up when usable proxies fall below this count",
+  "settings.sched_revalidate_enabled": "Periodically re-validate known proxies",
+  "settings.sched_revalidate_interval": "Validation interval (hours)",
+
+  "settings.ui_host": "Web console listen address",
+  "settings.ui_port": "Web console port",
+  "settings.forward_host": "Local forward proxy listen address",
+  "settings.http_proxy_port": "Local HTTP forward proxy port",
+  "settings.socks_port": "Local SOCKS5 forward proxy port",
+
+  "settings.ui_language": "Interface language",
+
+  "settings.save": "Save Settings",
+  "settings.restart_service": "Restart Service",
+  "settings.restart_now": "Restart Now",
+
+  "sched.never_run": "Never run",
+  "sched.last_run": "Last run: {time}",
+
+  "restart.network_pending": "Network settings changed but the service hasn't restarted yet - it's still running on the old address/port.",
+  "restart.network_saved": "Network settings saved - a service restart is required to take effect.",
+  "restart.confirm": "Restart the service now? The page will briefly disconnect and auto-refresh after a few seconds.",
+  "restart.restarting": "Restarting service...",
+  "restart.reconnect_failed": "Couldn't reconnect automatically after the restart - please refresh the page manually.",
+
+  "save.success_restart": "Saved. The following settings require a service restart to take effect: {fields}",
+  "save.success": "Saved, applied immediately.",
+  "save.error": "Save failed: {error}"
+}
