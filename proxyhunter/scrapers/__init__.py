@@ -18,7 +18,11 @@ def scrape_all(
     sources: list[str],
     pages: int = 3,
     protocols: list[str] | None = None,
+    fallback_proxies: list[Proxy] | None = None,
 ) -> list[Proxy]:
+    """fallback_proxies, if given, are already-validated proxies each scraper
+    will retry through (up to a few of them) if it can't reach its source
+    directly."""
     protocols = protocols or ["http", "socks4", "socks5"]
     proxies: list[Proxy] = []
 
@@ -32,7 +36,7 @@ def scrape_all(
             scraper = scraper_cls()
 
         try:
-            found = list(scraper.fetch())
+            found = list(scraper.fetch(fallback_proxies=fallback_proxies))
         except Exception as exc:  # noqa: BLE001 - a broken source shouldn't kill the run
             log.warning("scraper %s failed: %s", name, exc)
             continue

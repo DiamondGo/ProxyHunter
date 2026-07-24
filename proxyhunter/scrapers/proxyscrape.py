@@ -7,6 +7,7 @@ import requests
 
 from proxyhunter.models import Proxy
 from proxyhunter.scrapers.base import BaseScraper
+from proxyhunter.scrapers.fallback import get_with_fallback
 
 log = logging.getLogger(__name__)
 
@@ -20,11 +21,11 @@ class ProxyScrapeScraper(BaseScraper):
     def __init__(self, protocols: list[str] | None = None):
         self.protocols = [p for p in (protocols or ["http", "socks4", "socks5"]) if p in SUPPORTED_PROTOCOLS]
 
-    def fetch(self) -> Iterable[Proxy]:
+    def fetch(self, fallback_proxies: list[Proxy] | None = None) -> Iterable[Proxy]:
         for protocol in self.protocols:
-            yield from self._fetch_protocol(protocol)
+            yield from self._fetch_protocol(protocol, fallback_proxies)
 
-    def _fetch_protocol(self, protocol: str) -> Iterable[Proxy]:
+    def _fetch_protocol(self, protocol: str, fallback_proxies: list[Proxy] | None) -> Iterable[Proxy]:
         params = {
             "request": "getproxies",
             "protocol": protocol,
@@ -34,8 +35,9 @@ class ProxyScrapeScraper(BaseScraper):
             "anonymity": "all",
         }
         try:
-            resp = requests.get(API_URL, params=params, timeout=15)
-            resp.raise_for_status()
+            resp = get_with_fallback(
+                requests, API_URL, params=params, timeout=15, fallback_proxies=fallback_proxies
+            )
         except requests.RequestException as exc:
             log.warning("proxyscrape %s failed: %s", protocol, exc)
             return

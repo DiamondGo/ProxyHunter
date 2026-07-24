@@ -11,6 +11,7 @@ from pathlib import Path
 from proxyhunter.geolocate import fill_missing_geo
 from proxyhunter.models import Proxy
 from proxyhunter.scrapers import dedupe, scrape_all
+from proxyhunter.scrapers.fallback import select_fallback_candidates
 from proxyhunter.settings import DEFAULT_SETTINGS_FILE
 from proxyhunter.store import DEFAULT_STATE_FILE, ProxyStore
 from proxyhunter.validator import ProxyValidator
@@ -192,7 +193,8 @@ def main(argv: list[str] | None = None) -> int:
         protocols = [p.strip() for p in args.protocols.split(",") if p.strip()]
 
         log.info("scraping sources=%s pages=%d protocols=%s", sources, args.pages, protocols)
-        scraped = scrape_all(sources, pages=args.pages, protocols=protocols)
+        fallback_proxies = select_fallback_candidates(store.all_known_proxies())
+        scraped = scrape_all(sources, pages=args.pages, protocols=protocols, fallback_proxies=fallback_proxies)
         unique = dedupe(scraped)
         scraped_total, unique_total = len(scraped), len(unique)
         log.info("scraped %d proxies, %d unique", scraped_total, unique_total)

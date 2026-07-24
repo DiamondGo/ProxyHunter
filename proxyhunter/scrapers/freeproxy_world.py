@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from proxyhunter.models import Proxy
 from proxyhunter.scrapers.base import BaseScraper
+from proxyhunter.scrapers.fallback import get_with_fallback
 
 log = logging.getLogger(__name__)
 
@@ -26,14 +27,15 @@ class FreeProxyWorldScraper(BaseScraper):
         self.pages = max(1, pages)
         self.delay = delay
 
-    def fetch(self) -> Iterable[Proxy]:
+    def fetch(self, fallback_proxies: list[Proxy] | None = None) -> Iterable[Proxy]:
         session = requests.Session()
         session.headers.update({"User-Agent": USER_AGENT})
 
         for page in range(1, self.pages + 1):
             try:
-                resp = session.get(BASE_URL, params={"page": page}, timeout=15)
-                resp.raise_for_status()
+                resp = get_with_fallback(
+                    session, BASE_URL, params={"page": page}, timeout=15, fallback_proxies=fallback_proxies
+                )
             except requests.RequestException as exc:
                 log.warning("freeproxy.world page %d failed: %s", page, exc)
                 continue

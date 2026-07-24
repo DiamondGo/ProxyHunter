@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from proxyhunter.geolocate import fill_missing_geo
 from proxyhunter.scrapers import dedupe, scrape_all
+from proxyhunter.scrapers.fallback import select_fallback_candidates
 from proxyhunter.settings import SettingsStore
 from proxyhunter.store import ProxyStore
 from proxyhunter.validator import ProxyValidator
@@ -87,7 +88,10 @@ class JobRunner:
     def _run_full_scrape(self, opts: dict) -> None:
         try:
             self._set_message(f"scraping {opts['sources']}...")
-            scraped = scrape_all(opts["sources"], pages=opts["pages"], protocols=opts["protocols"])
+            fallback_proxies = select_fallback_candidates(self._store.all_known_proxies())
+            scraped = scrape_all(
+                opts["sources"], pages=opts["pages"], protocols=opts["protocols"], fallback_proxies=fallback_proxies
+            )
             unique = dedupe(scraped)
 
             to_check, reused_alive = self._store.split_fresh(unique, opts["recheck_after"])
