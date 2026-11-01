@@ -1,186 +1,196 @@
 from __future__ import annotations
 
-import logging
-import socket
-import socketserver
-import threading
+import asyncio
+import re
+from urllib.parse import urlsplit
 
 from proxyhunter.forwarder.pool import ProxyPool
-from proxyhunter.forwarder.tunnel import ReusableThreadingTCPServer, connect_via_upstream, relay
+from proxyhunter.forwarder.tunnel import (
+    CONNECTION_ERRORS,
+    MAX_HEAD_BYTES,
+    AsyncProxyServer,
+    RelayCancelledError,
+    authority,
+    close_writer,
+    connect_via_upstream,
+    relay,
+)
 from proxyhunter.settings import SettingsStore
 
-log = logging.getLogger(__name__)
-
-MAX_HEAD_BYTES = 1 << 20
 DEFAULT_MAX_RETRIES = 3
+TOKEN = re.compile(rb"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 
 
-class _HttpProxyHandler(socketserver.BaseRequestHandler):
-    pool: ProxyPool
-    settings: SettingsStore
+def parse_authority(target: str) -> tuple[str, int]:
+    """CONNECT authority, including bracketed IPv6; default port remains 443."""
+    parsed = urlsplit("//" + target)
+    if (
+        not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("invalid CONNECT authority")
+    port = parsed.port if parsed.port is not None else 443
+    if not 0 < port < 65536:
+        raise ValueError("invalid port")
+    return parsed.hostname, port
 
-    @property
-    def timeout(self) -> float:
-        return self.settings.get("timeout", 8.0)
 
-    @property
-    def max_retries(self) -> int:
-        return int(self.settings.get("pool_max_retries", DEFAULT_MAX_RETRIES))
+class LocalHttpProxy(AsyncProxyServer):
+    """HTTP/1 forwarder. start/shutdown are awaitable; construction does no I/O.
 
-    def handle(self) -> None:
-        client = self.request
-        client.settimeout(self.timeout)
+    Retries stop once a success response or any application request is written.
+    Pool success means relay payload moved, not merely a successful handshake or
+    the initial HTTP request headers. Plain requests request Connection: close;
+    SOCKS origin-form rewriting is for one origin/request per connection.
+    """
+
+    def __init__(self, pool: ProxyPool, settings: SettingsStore, host: str, port: int):
+        super().__init__(pool, settings, host, port)
+
+    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
-            head, leftover = self._read_until_headers_end(client)
-        except OSError:
+            head = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), self.timeout)
+            if len(head) > MAX_HEAD_BYTES:
+                await self._send_error(writer, 431, "request headers too large")
+                return
+        except asyncio.TimeoutError:
+            await self._send_error(writer, 408, "request header timeout")
             return
-        if not head:
+        except asyncio.LimitOverrunError:
+            await self._send_error(writer, 431, "request headers too large")
+            return
+        except asyncio.IncompleteReadError as exc:
+            if exc.partial:
+                await self._send_error(writer, 400, "incomplete request headers")
             return
 
         try:
-            request_line, _, header_block = head.partition(b"\r\n")
-            method, target, _ = request_line.split(b" ", 2)
-        except ValueError:
-            return
-
-        try:
+            lines = head[:-4].split(b"\r\n")
+            method, target, version = lines[0].split(b" ")
+            if not TOKEN.fullmatch(method) or version not in (b"HTTP/1.0", b"HTTP/1.1"):
+                raise ValueError("invalid request line")
+            headers = []
+            framing = {}
+            for line in lines[1:]:
+                name, sep, value = line.partition(b":")
+                if (
+                    not sep
+                    or not TOKEN.fullmatch(name)
+                    or any(c == 127 or (c < 32 and c != 9) for c in value)
+                ):
+                    raise ValueError("invalid request header")
+                lower = name.lower()
+                if lower in (b"content-length", b"transfer-encoding", b"host"):
+                    if lower in framing:
+                        raise ValueError("duplicate framing/Host header")
+                    framing[lower] = value.strip()
+                headers.append((name, value.strip()))
+            length = framing.get(b"content-length")
+            transfer = framing.get(b"transfer-encoding")
+            if (length is not None and not length.isdigit()) or (length is not None and transfer is not None):
+                raise ValueError("ambiguous/invalid request body length")
+            if transfer is not None and transfer.lower() != b"chunked":
+                raise ValueError("unsupported transfer encoding")
+            text = target.decode("ascii")
+            if any(ord(c) <= 32 or ord(c) == 127 for c in text):
+                raise ValueError("invalid target")
             if method == b"CONNECT":
-                self._handle_connect(client, target)
+                host, port = parse_authority(text)
+                path = None
             else:
-                self._handle_plain(client, method, target, header_block, leftover)
-        except (OSError, ConnectionError) as exc:
-            log.debug("proxy handling error: %s", exc)
-
-    def _handle_connect(self, client: socket.socket, target: bytes) -> None:
-        host_b, _, port_b = target.partition(b":")
-        host = host_b.decode()
-        port = int(port_b) if port_b else 443
+                parsed = urlsplit(text)
+                if (
+                    parsed.scheme != "http"
+                    or not parsed.hostname
+                    or parsed.username is not None
+                    or parsed.password is not None
+                    or parsed.fragment
+                ):
+                    raise ValueError("expected absolute-form http URI (use CONNECT for HTTPS)")
+                host, port = parsed.hostname, parsed.port if parsed.port is not None else 80
+                if not 0 < port < 65536:
+                    raise ValueError("invalid port")
+                path = (parsed.path or "/") + ("?" + parsed.query if parsed.query else "")
+        except (ValueError, UnicodeError) as exc:
+            await self._send_error(writer, 400, str(exc))
+            return
 
         candidates = self.pool.pick_many(self.max_retries + 1)
         if not candidates:
-            self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
+            await self._send_error(
+                writer, 502, "No upstream proxy selected in the proxyhunter UI forward pool"
+            )
             return
-
-        last_exc: Exception | None = None
+        last_exc = None
         for upstream in candidates:
             try:
-                remote = connect_via_upstream(upstream, host, port, timeout=self.timeout)
-            except (OSError, ConnectionError) as exc:
+                if path is None or upstream.protocol in ("socks4", "socks5"):
+                    remote_reader, remote_writer = await connect_via_upstream(
+                        upstream, host, port, self.timeout
+                    )
+                elif upstream.protocol in ("http", "https"):
+                    remote_reader, remote_writer = await asyncio.wait_for(
+                        asyncio.open_connection(upstream.ip, upstream.port),
+                        self.timeout,
+                    )
+                else:
+                    raise ValueError("unsupported upstream protocol")
+            except CONNECTION_ERRORS + (ValueError,) as exc:
                 self.pool.report_result(upstream, False)
                 last_exc = exc
                 continue
-            client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-            transferred = relay(client, remote)
-            self.pool.report_result(upstream, transferred > 0)
-            return
 
-        self._send_error(client, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}")
-
-    def _handle_plain(
-        self,
-        client: socket.socket,
-        method: bytes,
-        target: bytes,
-        header_block: bytes,
-        leftover: bytes,
-    ) -> None:
-        url = target.decode()
-        if "://" not in url:
-            self._send_error(client, 400, "expected absolute-form request URI")
-            return
-        _, _, after_scheme = url.partition("://")
-        host_port, _, path = after_scheme.partition("/")
-        path = "/" + path
-        if ":" in host_port:
-            host, port_s = host_port.split(":", 1)
-            port = int(port_s)
-        else:
-            host, port = host_port, 80
-
-        candidates = self.pool.pick_many(self.max_retries + 1)
-        if not candidates:
-            self._send_error(client, 502, "No upstream proxy selected in the proxyhunter UI forward pool")
-            return
-
-        last_exc: Exception | None = None
-        for upstream in candidates:
-            if upstream.protocol in ("socks4", "socks5"):
-                # SOCKS upstreams only tunnel raw TCP, so we connect straight to the
-                # origin server and rewrite the request line to origin-form.
-                try:
-                    remote = connect_via_upstream(upstream, host, port, timeout=self.timeout)
-                except (OSError, ConnectionError) as exc:
-                    self.pool.report_result(upstream, False)
-                    last_exc = exc
-                    continue
-                request_line = f"{method.decode()} {path} HTTP/1.1\r\n".encode()
-            else:
-                # http/https upstreams are real forward proxies: hand them the
-                # original absolute-form request line as-is.
-                try:
-                    remote = socket.create_connection((upstream.ip, upstream.port), timeout=self.timeout)
-                except OSError as exc:
-                    self.pool.report_result(upstream, False)
-                    last_exc = exc
-                    continue
-                request_line = method + b" " + target + b" HTTP/1.1\r\n"
-
-            remote.sendall(request_line + header_block)
-            if leftover:
-                remote.sendall(leftover)
-            transferred = relay(client, remote)
-            self.pool.report_result(upstream, transferred > 0)
-            return
-
-        self._send_error(client, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}")
-
-    @staticmethod
-    def _read_until_headers_end(client: socket.socket) -> tuple[bytes, bytes]:
-        """Read until the HTTP header terminator. Returns (head incl. terminator, leftover bytes)."""
-        buf = b""
-        while b"\r\n\r\n" not in buf:
-            chunk = client.recv(65536)
-            if not chunk:
-                break
-            buf += chunk
-            if len(buf) > MAX_HEAD_BYTES:
-                break
-        head, sep, rest = buf.partition(b"\r\n\r\n")
-        if sep:
-            return head + sep, rest
-        return buf, b""
-
-    @staticmethod
-    def _send_error(client: socket.socket, code: int, message: str) -> None:
-        body = message.encode()
-        resp = (
-            f"HTTP/1.1 {code} Proxy Error\r\n"
-            f"Content-Type: text/plain\r\n"
-            f"Content-Length: {len(body)}\r\n"
-            f"Connection: close\r\n\r\n"
-        ).encode() + body
-        try:
-            client.sendall(resp)
-        except OSError:
-            pass
-        finally:
+            transferred = 0
             try:
-                client.close()
-            except OSError:
-                pass
+                # No retries beyond here: even a failed drain can have sent bytes.
+                if path is None:
+                    writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                    await asyncio.wait_for(writer.drain(), self.timeout)
+                else:
+                    request_target = (
+                        path.encode("ascii") if upstream.protocol in ("socks4", "socks5") else target
+                    )
+                    chunks = [method + b" " + request_target + b" " + version + b"\r\n"]
+                    for name, value in headers:
+                        if name.lower() not in (
+                            b"proxy-connection",
+                            b"proxy-authorization",
+                            b"connection",
+                            b"host",
+                        ):
+                            chunks.append(name + b": " + value + b"\r\n")
+                    chunks.append(
+                        f"Host: {authority(host, port)}\r\nConnection: close\r\n\r\n".encode("ascii")
+                    )
+                    remote_writer.write(b"".join(chunks))
+                    await asyncio.wait_for(remote_writer.drain(), self.timeout)
+                # readuntil left body/early CONNECT payload in reader; relay owns it.
+                transferred = await relay(reader, writer, remote_reader, remote_writer, self.idle_timeout)
+            except RelayCancelledError as exc:
+                transferred = exc.transferred
+                raise
+            finally:
+                await close_writer(remote_writer)
+                self.pool.report_result(upstream, transferred > 0)
+            return
+        await self._send_error(
+            writer, 502, f"upstream connect failed after {len(candidates)} attempt(s): {last_exc}"
+        )
 
-
-class LocalHttpProxy:
-    def __init__(self, pool: ProxyPool, settings: SettingsStore, host: str, port: int):
-        handler = type("BoundHttpProxyHandler", (_HttpProxyHandler,), {"pool": pool, "settings": settings})
-        self._server = ReusableThreadingTCPServer((host, port), handler)
-        self.host, self.port = host, port
-
-    def start_in_thread(self) -> threading.Thread:
-        t = threading.Thread(target=self._server.serve_forever, daemon=True, name="http-forward-proxy")
-        t.start()
-        return t
-
-    def shutdown(self) -> None:
-        self._server.shutdown()
-        self._server.server_close()
+    async def _send_error(self, writer: asyncio.StreamWriter, code: int, message: str) -> None:
+        body = message.encode("utf-8", errors="replace")
+        writer.write(
+            (
+                f"HTTP/1.1 {code} Proxy Error\r\nContent-Type: text/plain\r\n"
+                f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n"
+            ).encode()
+            + body
+        )
+        try:
+            await asyncio.wait_for(writer.drain(), self.timeout)
+        except CONNECTION_ERRORS:
+            pass

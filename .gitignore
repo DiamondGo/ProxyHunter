@@ -9,6 +9,12 @@ build/
 dist/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+coverage.json
 
 # Personal / runtime data (scraped proxies, settings, scrape output)
 proxyhunter_state.json

@@ -1,4 +1,4 @@
-requests>=2.31
-beautifulsoup4>=4.12
-PySocks>=1.7
-flask>=3.0
+aiohttp>=3.10,<4
+aiohttp-socks>=0.10,<1
+python-socks[asyncio]>=2.4.3,<4
+beautifulsoup4>=4.12,<5

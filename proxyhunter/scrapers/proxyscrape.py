@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
-import requests
+import aiohttp
 
 from proxyhunter.models import Proxy
 from proxyhunter.scrapers.base import BaseScraper
-from proxyhunter.scrapers.fallback import get_with_fallback
+from proxyhunter.scrapers.fallback import NETWORK_ERRORS, get_with_fallback
 
 log = logging.getLogger(__name__)
 
@@ -21,11 +21,19 @@ class ProxyScrapeScraper(BaseScraper):
     def __init__(self, protocols: list[str] | None = None):
         self.protocols = [p for p in (protocols or ["http", "socks4", "socks5"]) if p in SUPPORTED_PROTOCOLS]
 
-    def fetch(self, fallback_proxies: list[Proxy] | None = None) -> Iterable[Proxy]:
-        for protocol in self.protocols:
-            yield from self._fetch_protocol(protocol, fallback_proxies)
+    async def fetch(self, fallback_proxies: list[Proxy] | None = None) -> list[Proxy]:
+        results = []
+        async with aiohttp.ClientSession(trust_env=False) as session:
+            for protocol in self.protocols:
+                results.extend(await self._fetch_protocol(protocol, fallback_proxies, session))
+        return results
 
-    def _fetch_protocol(self, protocol: str, fallback_proxies: list[Proxy] | None) -> Iterable[Proxy]:
+    async def _fetch_protocol(
+        self,
+        protocol: str,
+        fallback_proxies: list[Proxy] | None,
+        session: aiohttp.ClientSession,
+    ) -> list[Proxy]:
         params = {
             "request": "getproxies",
             "protocol": protocol,
@@ -35,14 +43,16 @@ class ProxyScrapeScraper(BaseScraper):
             "anonymity": "all",
         }
         try:
-            resp = get_with_fallback(
-                requests, API_URL, params=params, timeout=15, fallback_proxies=fallback_proxies
+            resp = await get_with_fallback(
+                session, API_URL, params=params, timeout=15, fallback_proxies=fallback_proxies
             )
-        except requests.RequestException as exc:
+        except NETWORK_ERRORS as exc:
             log.warning("proxyscrape %s failed: %s", protocol, exc)
-            return
+            return []
+        return list(self._parse(resp.text, protocol))
 
-        for line in resp.text.splitlines():
+    def _parse(self, text: str, protocol: str) -> Iterable[Proxy]:
+        for line in text.splitlines():
             line = line.strip()
             if not line or ":" not in line:
                 continue

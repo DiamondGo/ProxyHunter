@@ -14,7 +14,7 @@ SCRAPERS = {
 }
 
 
-def scrape_all(
+async def scrape_all(
     sources: list[str],
     pages: int = 3,
     protocols: list[str] | None = None,
@@ -27,16 +27,15 @@ def scrape_all(
     proxies: list[Proxy] = []
 
     for name in sources:
-        scraper_cls = SCRAPERS[name]
-        if name == "freeproxy_world":
-            scraper = scraper_cls(pages=pages)
-        elif name == "proxyscrape":
-            scraper = scraper_cls(protocols=protocols)
-        else:
-            scraper = scraper_cls()
-
         try:
-            found = list(scraper.fetch(fallback_proxies=fallback_proxies))
+            scraper_cls = SCRAPERS[name]
+            if name == "freeproxy_world":
+                scraper = scraper_cls(pages=pages)
+            elif name == "proxyscrape":
+                scraper = scraper_cls(protocols=protocols)
+            else:
+                scraper = scraper_cls()
+            found = await scraper.fetch(fallback_proxies=fallback_proxies)
         except Exception as exc:  # noqa: BLE001 - a broken source shouldn't kill the run
             log.warning("scraper %s failed: %s", name, exc)
             continue

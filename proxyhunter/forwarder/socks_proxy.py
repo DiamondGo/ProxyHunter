@@ -1,138 +1,108 @@
 from __future__ import annotations
 
-import logging
-import socket
-import socketserver
+import asyncio
+import ipaddress
 import struct
-import threading
 
 from proxyhunter.forwarder.pool import ProxyPool
-from proxyhunter.forwarder.tunnel import ReusableThreadingTCPServer, connect_via_upstream, relay
+from proxyhunter.forwarder.tunnel import (
+    CONNECTION_ERRORS,
+    AsyncProxyServer,
+    RelayCancelledError,
+    close_writer,
+    connect_via_upstream,
+    relay,
+)
 from proxyhunter.settings import SettingsStore
-
-log = logging.getLogger(__name__)
 
 SOCKS_VERSION = 0x05
 CMD_CONNECT = 0x01
 ATYP_IPV4 = 0x01
 ATYP_DOMAIN = 0x03
 ATYP_IPV6 = 0x04
-
 REP_SUCCESS = 0x00
 REP_GENERAL_FAILURE = 0x01
 REP_COMMAND_NOT_SUPPORTED = 0x07
 REP_ADDRESS_TYPE_NOT_SUPPORTED = 0x08
-
 DEFAULT_MAX_RETRIES = 3
 
 
-class _Socks5Handler(socketserver.BaseRequestHandler):
-    pool: ProxyPool
-    settings: SettingsStore
+class LocalSocks5Proxy(AsyncProxyServer):
+    """No-auth SOCKS5 CONNECT listener with tracked, cancellable async handlers."""
 
-    @property
-    def timeout(self) -> float:
-        return self.settings.get("timeout", 8.0)
+    def __init__(self, pool: ProxyPool, settings: SettingsStore, host: str, port: int):
+        super().__init__(pool, settings, host, port)
 
-    @property
-    def max_retries(self) -> int:
-        return int(self.settings.get("pool_max_retries", DEFAULT_MAX_RETRIES))
-
-    def handle(self) -> None:
-        client = self.request
-        client.settimeout(self.timeout)
-        try:
-            if not self._negotiate_auth(client):
-                return
-            target_host, target_port = self._read_request(client)
-        except (OSError, ValueError):
+    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        # One total deadline prevents byte-at-a-time handshake slowloris attacks.
+        target = await asyncio.wait_for(self._handshake(reader, writer), self.timeout)
+        if target is None:
             return
-        if target_host is None:
-            return
-
-        candidates = self.pool.pick_many(self.max_retries + 1)
-        if not candidates:
-            self._reply(client, REP_GENERAL_FAILURE)
-            return
-
-        for upstream in candidates:
+        host, port = target
+        for upstream in self.pool.pick_many(self.max_retries + 1):
             try:
-                remote = connect_via_upstream(upstream, target_host, target_port, timeout=self.timeout)
-            except (OSError, ConnectionError) as exc:
-                log.debug("socks upstream connect via %s:%s failed: %s", upstream.ip, upstream.port, exc)
+                remote_reader, remote_writer = await connect_via_upstream(upstream, host, port, self.timeout)
+            except CONNECTION_ERRORS + (ValueError,):
                 self.pool.report_result(upstream, False)
                 continue
-            self._reply(client, REP_SUCCESS)
-            transferred = relay(client, remote)
-            self.pool.report_result(upstream, transferred > 0)
+            transferred = 0
+            try:
+                await self._reply(writer, REP_SUCCESS)
+                transferred = await relay(reader, writer, remote_reader, remote_writer, self.idle_timeout)
+            except RelayCancelledError as exc:
+                transferred = exc.transferred
+                raise
+            finally:
+                await close_writer(remote_writer)
+                self.pool.report_result(upstream, transferred > 0)
             return
+        await self._reply(writer, REP_GENERAL_FAILURE)
 
-        self._reply(client, REP_GENERAL_FAILURE)
-
-    def _negotiate_auth(self, client: socket.socket) -> bool:
-        header = self._recvn(client, 2)
-        version, nmethods = header[0], header[1]
+    async def _handshake(self, reader, writer) -> tuple[str, int] | None:
+        version, count = await reader.readexactly(2)
         if version != SOCKS_VERSION:
-            return False
-        methods = self._recvn(client, nmethods)
-        if 0x00 not in methods:
-            client.sendall(bytes([SOCKS_VERSION, 0xFF]))
-            return False
-        client.sendall(bytes([SOCKS_VERSION, 0x00]))
-        return True
-
-    def _read_request(self, client: socket.socket) -> tuple[str | None, int]:
-        header = self._recvn(client, 4)
-        version, cmd, _rsv, atyp = header
-        if version != SOCKS_VERSION or cmd != CMD_CONNECT:
-            self._reply(client, REP_COMMAND_NOT_SUPPORTED)
-            return None, 0
-
-        if atyp == ATYP_IPV4:
-            addr = socket.inet_ntoa(self._recvn(client, 4))
+            return None
+        methods = await reader.readexactly(count)
+        if 0 not in methods:
+            writer.write(b"\x05\xff")
+            await writer.drain()
+            return None
+        writer.write(b"\x05\x00")
+        await writer.drain()
+        version, cmd, reserved, atyp = await reader.readexactly(4)
+        if version != SOCKS_VERSION or reserved != 0:
+            await self._reply(writer, REP_GENERAL_FAILURE)
+            return None
+        if cmd != CMD_CONNECT:
+            await self._reply(writer, REP_COMMAND_NOT_SUPPORTED)
+            return None
+        if atyp in (ATYP_IPV4, ATYP_IPV6):
+            raw = await reader.readexactly(4 if atyp == ATYP_IPV4 else 16)
+            host = str(ipaddress.ip_address(raw))
         elif atyp == ATYP_DOMAIN:
-            length = self._recvn(client, 1)[0]
-            addr = self._recvn(client, length).decode()
-        elif atyp == ATYP_IPV6:
-            addr = socket.inet_ntop(socket.AF_INET6, self._recvn(client, 16))
+            length = (await reader.readexactly(1))[0]
+            raw = await reader.readexactly(length)
+            try:
+                host = raw.decode("idna")
+                if not host or any(c in host for c in "\x00\r\n /:"):
+                    raise ValueError("invalid domain")
+                # Send an ASCII IDNA name on the wire to upstream CONNECT.
+                host = host.encode("idna").decode("ascii")
+            except UnicodeError:
+                await self._reply(writer, REP_ADDRESS_TYPE_NOT_SUPPORTED)
+                return None
+            except ValueError:
+                await self._reply(writer, REP_ADDRESS_TYPE_NOT_SUPPORTED)
+                return None
         else:
-            self._reply(client, REP_ADDRESS_TYPE_NOT_SUPPORTED)
-            return None, 0
+            await self._reply(writer, REP_ADDRESS_TYPE_NOT_SUPPORTED)
+            return None
+        port = struct.unpack("!H", await reader.readexactly(2))[0]
+        if port == 0:
+            await self._reply(writer, REP_GENERAL_FAILURE)
+            return None
+        return host, port
 
-        port = struct.unpack("!H", self._recvn(client, 2))[0]
-        return addr, port
-
-    @staticmethod
-    def _recvn(sock: socket.socket, n: int) -> bytes:
-        buf = b""
-        while len(buf) < n:
-            chunk = sock.recv(n - len(buf))
-            if not chunk:
-                raise OSError("connection closed while reading SOCKS5 handshake")
-            buf += chunk
-        return buf
-
-    @staticmethod
-    def _reply(client: socket.socket, rep: int) -> None:
-        try:
-            client.sendall(
-                bytes([SOCKS_VERSION, rep, 0x00, ATYP_IPV4]) + socket.inet_aton("0.0.0.0") + struct.pack("!H", 0)
-            )
-        except OSError:
-            pass
-
-
-class LocalSocks5Proxy:
-    def __init__(self, pool: ProxyPool, settings: SettingsStore, host: str, port: int):
-        handler = type("BoundSocks5Handler", (_Socks5Handler,), {"pool": pool, "settings": settings})
-        self._server = ReusableThreadingTCPServer((host, port), handler)
-        self.host, self.port = host, port
-
-    def start_in_thread(self) -> threading.Thread:
-        t = threading.Thread(target=self._server.serve_forever, daemon=True, name="socks5-forward-proxy")
-        t.start()
-        return t
-
-    def shutdown(self) -> None:
-        self._server.shutdown()
-        self._server.server_close()
+    async def _reply(self, writer, rep: int) -> None:
+        writer.write(bytes([SOCKS_VERSION, rep, 0, ATYP_IPV4]) + b"\x00" * 6)
+        await asyncio.wait_for(writer.drain(), self.timeout)

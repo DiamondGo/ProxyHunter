@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import csv
 import json
 import logging
 import sys
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from proxyhunter.geolocate import fill_missing_geo
 from proxyhunter.models import Proxy
@@ -17,6 +20,7 @@ from proxyhunter.store import DEFAULT_STATE_FILE, ProxyStore
 from proxyhunter.validator import ProxyValidator
 
 log = logging.getLogger("proxyhunter")
+T = TypeVar("T")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,7 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated sources: freeproxy_world,proxyscrape or 'all' (default: all). Ignored with --revalidate.",
     )
     parser.add_argument(
-        "--pages", type=int, default=3,
+        "--pages",
+        type=int,
+        default=3,
         help="Pages to scrape from freeproxy.world (default: 3). Ignored with --revalidate.",
     )
     parser.add_argument(
@@ -40,8 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
         "Ignored with --revalidate.",
     )
     parser.add_argument("--workers", type=int, default=50, help="Concurrent validation workers (default: 50)")
-    parser.add_argument("--timeout", type=float, default=8.0, help="Per-request timeout in seconds (default: 8)")
-    parser.add_argument("--limit", type=int, default=None, help="Cap number of proxies validated (for testing)")
+    parser.add_argument(
+        "--timeout", type=float, default=8.0, help="Per-request timeout in seconds (default: 8)"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Cap number of proxies validated (for testing)"
+    )
     parser.add_argument(
         "--no-secondary-check",
         action="store_true",
@@ -59,7 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
         "whatever the source site or --geo-lookup said). More accurate but adds one request per alive "
         "proxy, so validation is slower. Off by default.",
     )
-    parser.add_argument("--output-dir", default="./output", help="Directory to write result files (default: ./output)")
+    parser.add_argument(
+        "--output-dir", default="./output", help="Directory to write result files (default: ./output)"
+    )
     parser.add_argument(
         "--state-file",
         default=DEFAULT_STATE_FILE,
@@ -93,15 +105,22 @@ def build_parser() -> argparse.ArgumentParser:
         "scraping. The dashboard lets you trigger a full scrape, validate selected proxies, and choose "
         "which proxies the local forwarders route traffic through.",
     )
-    parser.add_argument("--ui-host", default="127.0.0.1", help="Host for the web dashboard (default: 127.0.0.1)")
-    parser.add_argument("--ui-port", type=int, default=9527, help="Port for the web dashboard (default: 9527)")
+    parser.add_argument(
+        "--ui-host", default="127.0.0.1", help="Host for the web dashboard (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--ui-port", type=int, default=9527, help="Port for the web dashboard (default: 9527)"
+    )
     parser.add_argument(
         "--forward-host",
         default="127.0.0.1",
         help="Host the local HTTP/SOCKS5 forward proxies bind to (default: 127.0.0.1, i.e. loopback only)",
     )
     parser.add_argument(
-        "--http-proxy-port", type=int, default=9528, help="Port for the local HTTP forward proxy (default: 9528)"
+        "--http-proxy-port",
+        type=int,
+        default=9528,
+        help="Port for the local HTTP forward proxy (default: 9528)",
     )
     parser.add_argument(
         "--socks-port", type=int, default=9529, help="Port for the local SOCKS5 forward proxy (default: 9529)"
@@ -118,38 +137,108 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def write_outputs(proxies: list[Proxy], output_dir: Path) -> None:
+    """Write the legacy exports synchronously; async callers must offload this."""
     output_dir.mkdir(parents=True, exist_ok=True)
     ordered = sorted(proxies, key=lambda p: (p.latency_ms is None, p.latency_ms))
 
     json_path = output_dir / "proxies_valid.json"
-    json_path.write_text(json.dumps([p.to_dict() for p in ordered], indent=2, ensure_ascii=False))
+    json_path.write_text(
+        json.dumps([p.to_dict() for p in ordered], indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
     csv_path = output_dir / "proxies_valid.csv"
-    with csv_path.open("w", newline="") as f:
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["ip", "port", "protocol", "source", "country", "city", "isp",
-             "latency_ms", "supports_https", "https_only", "anonymity", "checked_at"]
+            [
+                "ip",
+                "port",
+                "protocol",
+                "source",
+                "country",
+                "city",
+                "isp",
+                "latency_ms",
+                "supports_https",
+                "https_only",
+                "anonymity",
+                "checked_at",
+            ]
         )
         for p in ordered:
             writer.writerow(
-                [p.ip, p.port, p.protocol, p.source, p.country, p.city, p.isp,
-                 p.latency_ms, p.supports_https, p.https_only, p.anonymity, p.checked_at]
+                [
+                    p.ip,
+                    p.port,
+                    p.protocol,
+                    p.source,
+                    p.country,
+                    p.city,
+                    p.isp,
+                    p.latency_ms,
+                    p.supports_https,
+                    p.https_only,
+                    p.anonymity,
+                    p.checked_at,
+                ]
             )
 
     txt_path = output_dir / "proxies_valid.txt"
-    txt_path.write_text("\n".join(p.proxy_url() for p in ordered) + ("\n" if ordered else ""))
+    txt_path.write_text(
+        "\n".join(p.proxy_url() for p in ordered) + ("\n" if ordered else ""), encoding="utf-8"
+    )
 
     log.info("wrote %d valid proxies to %s", len(ordered), output_dir)
 
 
+async def _run_blocking(function: Callable[..., T], *args) -> T:
+    """Do not leave a disk worker running after cancellation, even repeated cancellation."""
+    task = asyncio.create_task(asyncio.to_thread(function, *args))
+    cancelled = None
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError as exc:
+            cancelled = exc
+        except Exception:
+            if cancelled is None:
+                raise
+    try:
+        result = task.result()
+    except Exception as exc:
+        if cancelled is not None:
+            raise cancelled from exc
+        raise
+    if cancelled is not None:
+        raise cancelled
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
+    """Synchronous process boundary; all application work uses this single loop."""
+    try:
+        return asyncio.run(async_main(argv))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        log.info("interrupted")
+        return 130
+
+
+async def async_main(argv: list[str] | None = None) -> int:
+    """In-loop entry point. Cancellation propagates to the embedding caller."""
     args = build_parser().parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    try:
+        return await run(args)
+    except (OSError, ValueError, TypeError) as exc:
+        log.error("could not complete run: %s", exc, exc_info=args.verbose)
+        return 1
 
+
+async def run(args: argparse.Namespace) -> int:
+    """Run parsed CLI options without creating or taking ownership of a loop."""
     if args.serve:
         from proxyhunter.webapp import run_server
 
@@ -173,10 +262,18 @@ def main(argv: list[str] | None = None) -> int:
             "socks_port": args.socks_port,
             "state_file": args.state_file,
         }
-        run_server(settings_file=Path(args.settings_file), cli_seed=cli_seed)
+        await run_server(settings_file=Path(args.settings_file), cli_seed=cli_seed)
         return 0
 
     store = ProxyStore(Path(args.state_file))
+    try:
+        await store.load()
+        return await _run_batch(args, store)
+    finally:
+        await store.flush()
+
+
+async def _run_batch(args: argparse.Namespace, store: ProxyStore) -> int:
     scraped_total = unique_total = None
     reused_alive: list[Proxy] = []
 
@@ -186,7 +283,9 @@ def main(argv: list[str] | None = None) -> int:
             to_check = [p for p in to_check if (store.age_hours(p) or 0) >= args.min_age]
         log.info(
             "revalidate mode: %d known proxies loaded from %s (min-age=%sh)",
-            len(to_check), args.state_file, args.min_age,
+            len(to_check),
+            args.state_file,
+            args.min_age,
         )
     else:
         sources = ["freeproxy_world", "proxyscrape"] if args.sources == "all" else args.sources.split(",")
@@ -194,7 +293,12 @@ def main(argv: list[str] | None = None) -> int:
 
         log.info("scraping sources=%s pages=%d protocols=%s", sources, args.pages, protocols)
         fallback_proxies = select_fallback_candidates(store.all_known_proxies())
-        scraped = scrape_all(sources, pages=args.pages, protocols=protocols, fallback_proxies=fallback_proxies)
+        scraped = await scrape_all(
+            sources,
+            pages=args.pages,
+            protocols=protocols,
+            fallback_proxies=fallback_proxies,
+        )
         unique = dedupe(scraped)
         scraped_total, unique_total = len(scraped), len(unique)
         log.info("scraped %d proxies, %d unique", scraped_total, unique_total)
@@ -207,7 +311,9 @@ def main(argv: list[str] | None = None) -> int:
         skipped_dead = unique_total - len(to_check) - len(reused_alive)
         log.info(
             "%d reused from cache (alive, unchanged), %d skipped (recently confirmed dead), %d need (re)validation",
-            len(reused_alive), skipped_dead, len(to_check),
+            len(reused_alive),
+            skipped_dead,
+            len(to_check),
         )
 
     if args.limit:
@@ -226,17 +332,19 @@ def main(argv: list[str] | None = None) -> int:
     freshly_checked: list[Proxy] = []
     if to_check:
         log.info("validating %d proxies with %d workers...", len(to_check), args.workers)
-        freshly_checked = validator.validate_all(to_check)
-        store.upsert_all(freshly_checked)
+        freshly_checked = await validator.validate_all(to_check)
 
     fresh_alive = [p for p in freshly_checked if p.alive]
     alive = fresh_alive + reused_alive
 
     if not args.no_geo_lookup:
-        fill_missing_geo(alive)
+        await fill_missing_geo(alive)
 
-    write_outputs(alive, Path(args.output_dir))
-    store.save()
+    # upsert takes a snapshot: include final geo metadata for fresh AND cached
+    # proxies, and retain freshly checked dead results for the next cache split.
+    store.upsert_all(freshly_checked + reused_alive)
+    await _run_blocking(write_outputs, alive, Path(args.output_dir))
+    await store.save()
 
     anonymity_counts = Counter(p.anonymity or "unknown" for p in alive)
     https_count = sum(1 for p in alive if p.supports_https)

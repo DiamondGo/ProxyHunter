@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-import time
-from typing import Iterable
+from collections.abc import Iterable
 
-import requests
+import aiohttp
 from bs4 import BeautifulSoup
 
 from proxyhunter.models import Proxy
 from proxyhunter.scrapers.base import BaseScraper
-from proxyhunter.scrapers.fallback import get_with_fallback
+from proxyhunter.scrapers.fallback import NETWORK_ERRORS, get_with_fallback
 
 log = logging.getLogger(__name__)
 
@@ -27,23 +27,24 @@ class FreeProxyWorldScraper(BaseScraper):
         self.pages = max(1, pages)
         self.delay = delay
 
-    def fetch(self, fallback_proxies: list[Proxy] | None = None) -> Iterable[Proxy]:
-        session = requests.Session()
-        session.headers.update({"User-Agent": USER_AGENT})
-
-        for page in range(1, self.pages + 1):
-            try:
-                resp = get_with_fallback(
-                    session, BASE_URL, params={"page": page}, timeout=15, fallback_proxies=fallback_proxies
-                )
-            except requests.RequestException as exc:
-                log.warning("freeproxy.world page %d failed: %s", page, exc)
-                continue
-
-            yield from self._parse(resp.text)
-
-            if page < self.pages:
-                time.sleep(self.delay)
+    async def fetch(self, fallback_proxies: list[Proxy] | None = None) -> list[Proxy]:
+        results = []
+        async with aiohttp.ClientSession(headers={"User-Agent": USER_AGENT}, trust_env=False) as session:
+            for page in range(1, self.pages + 1):
+                try:
+                    resp = await get_with_fallback(
+                        session,
+                        BASE_URL,
+                        params={"page": page},
+                        timeout=15,
+                        fallback_proxies=fallback_proxies,
+                    )
+                    results.extend(self._parse(resp.text))
+                except NETWORK_ERRORS as exc:
+                    log.warning("freeproxy.world page %d failed: %s", page, exc)
+                if page < self.pages:
+                    await asyncio.sleep(max(0, self.delay))
+        return results
 
     def _parse(self, html: str) -> Iterable[Proxy]:
         soup = BeautifulSoup(html, "html.parser")
@@ -65,11 +66,9 @@ class FreeProxyWorldScraper(BaseScraper):
             city = cells[3].get_text(strip=True) or None
 
             protocol_tags = cells[5].find_all("a")
-            protocols = [
-                t.get_text(strip=True).lower()
-                for t in protocol_tags
-                if t.get_text(strip=True)
-            ] or ["http"]
+            protocols = [t.get_text(strip=True).lower() for t in protocol_tags if t.get_text(strip=True)] or [
+                "http"
+            ]
 
             anonymity_text = cells[6].get_text(strip=True).lower()
 
